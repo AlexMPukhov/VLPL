@@ -1,0 +1,58 @@
+# Bubble benchmark (VLPL bench/lwfa_bubble/rip.deck) in RZ on FBPIC's grid (fbpic_bubble.py: 600 x 80, dz = 0.05 um,
+# dr = 0.25 um = 5 c dt, 2 modes, 2 x 2 x 8 particles per cell). Paper review 2026-11-12, points 3 and 4.
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 600
+  nr         = 80
+  dz         = 0.05 um
+  dr         = 0.25 um
+  boundary_z = open
+  t_end      = 1000.5 fs
+}
+numerics {
+  solver = irip
+  shape  = 2
+  pusher = higuera_cary
+}
+laser {
+  a0           = 4
+  polarization = x
+  duration     = 20 fs
+  waist        = 7.2 um
+}
+window {
+  start = 99.8 fs
+}
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.005
+  zmin      = 32 um
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  density_function = z < 52 um ? (z - 32 um) / (20 um) : 1
+}
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.005
+  zmin      = 32 um
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  density_function = z < 52 um ? (z - 32 um) / (20 um) : 1
+}
+diagnostic injected {
+  species   = electrons
+  every     = 600
+  gamma_min = 20
+  bins      = 200
+  e_max_mev = 400
+}
+output {
+  dir   = out
+  every = 60
+}

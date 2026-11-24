@@ -1,0 +1,63 @@
+# Short, narrow s-polarized laser pulse (E along z) reflected by an overdense plasma layer tilted by
+# 22.5 deg: the reflected pulse leaves at 45 deg towards -x, -y. Quasi-2D: the z-direction is
+# periodic with 4 cells and the pulse is uniform in z. y is periodic and tall enough that the
+# reflected pulse leaves through the open left boundary before it reaches y = 0.
+#   build/vlpl examples/laser_reflection.deck
+#   python3 tools/movie.py out_reflect --fields Ez n_electrons
+grid {
+  lambda0    = 0.8 um
+  nx         = 384             # 12.8 um, 24 cells per wavelength along x (c dt = dx)
+  ny         = 384             # 19.2 um, 16 cells per wavelength
+  nz         = 4
+  dx         = 0.033333 um
+  dy         = 0.05 um
+  dz         = 0.8 um
+  boundary_x = open            # the laser enters through the left boundary, waves leave at both ends
+  t_end      = 70 fs
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 2
+  polarization = z
+  duration     = 8 fs          # intensity FWHM, 3 cycles
+  waist        = 1.2 um        # 1.5 lambda, focus at the entrance plane x = 0
+  y_center     = 13 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 6                  # n_c
+  ppc_x   = 4
+  ppc_y   = 4
+  ppc_z   = 1
+  slab_x0        = 7 um
+  slab_y0        = 13 um
+  slab_angle     = 22.5 deg
+  slab_thickness = 1 um
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 6
+  ppc_x   = 4
+  ppc_y   = 4
+  ppc_z   = 1
+  slab_x0        = 7 um
+  slab_y0        = 13 um
+  slab_angle     = 22.5 deg
+  slab_thickness = 1 um
+}
+
+output {
+  dir          = out_reflect
+  every        = 10
+  slice_every  = 5
+  slice_fields = Ez Ex Ey Bz n_electrons
+}

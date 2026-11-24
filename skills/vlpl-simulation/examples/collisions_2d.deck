@@ -1,0 +1,61 @@
+# Binary collisions and impact ionization (docs/specs/collisions.md, decision 94) in a full PIC run: a dense aluminium plasma
+# (n_e = 2 n_c = 3.5e21 cm^-3, Al3+) with hot electrons (T_e = 200 eV) and cold ions (T_i = 20 eV) relaxes, electron-ion
+# collision time ~ 20 fs, and the hot electrons ionize Al3+ -> Al4+ (I = 120 eV). Coulomb logarithm automatic (Perez et al.
+# 2012: Debye length of the cell, classical / quantum minimum impact parameter, at least 2). Periodic 2D box, shape 2.
+# out_collisions_2d/collisions.txt: per block the pairs, <s>, <lnL>, the kinetic energy changed; the impact events, the
+# ionization energy, <Z>; per species <u>, T_x, T_y, T_z, <E_kin>.
+#   build/vlpl examples/collisions_2d.deck
+grid {
+  geometry = cartesian2d
+  lambda0  = 0.8 um
+  nx       = 128             # 0.64 um
+  ny       = 32              # 0.32 um
+  dx       = 0.005 um        # 2.8 Debye lengths
+  dy       = 0.01 um
+  t_end    = 30 fs
+}
+
+numerics {
+  shape = 2
+}
+
+species electrons {
+  charge = -1
+  mass   = 1
+  density = 2
+  ppc_x  = 4
+  ppc_y  = 4
+  uth_x  = 0.0197836         # 200 eV
+  uth_y  = 0.0197836
+  uth_z  = 0.0197836
+}
+
+species aluminium {
+  element      = Al
+  charge_state = 3
+  density      = 0.6666666667  # ions, n_c
+  ppc_x        = 4
+  ppc_y        = 4
+  uth_x        = 2.82e-5       # 20 eV
+  uth_y        = 2.82e-5
+  uth_z        = 2.82e-5
+}
+
+collisions ee {
+  species1 = electrons
+}
+
+collisions ei {
+  species1 = electrons
+  species2 = aluminium
+  ionizing = true
+}
+
+collisions ii {
+  species1 = aluminium
+}
+
+output {
+  dir   = out_collisions_2d
+  every = 50
+}

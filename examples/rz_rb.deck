@@ -1,0 +1,58 @@
+# O7, model = bound in RZ (decision 85, docs/specs/linear_medium.md "Bound electrons"): an 800 nm pulse (m = 1, polarization x)
+# through Rb vapour as V-type Maxwell-Bloch atoms on 8 azimuthal samples, with ADK ionization of every level into electrons and
+# Rb+ ions (pairs at rest at the atom positions). a0 = 1.5e-3 (5e12 W/cm^2): the D lines saturate and most atoms ionize.
+# dir/medium.txt: K (the atoms' energy), the dissipated energy (ionization), the balance, the solver statistics, ionized / emitted.
+#   build/vlpl examples/rz_rb.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 480             # 12 um, lambda / 32
+  nr         = 64
+  dz         = 0.025 um
+  dr         = 0.05 um
+  boundary_z = open
+  t_end      = 60 fs
+}
+
+numerics {
+  solver = irip
+  shape  = 2
+}
+
+laser {
+  a0           = 1.5e-3
+  polarization = x
+  duration     = 8 fs
+  delay        = 10 fs
+  waist        = 1.2 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0                  # filled by the ionization
+}
+
+species rb_ions {
+  charge  = 1
+  mass    = 156700             # 85.47 u
+  density = 0
+}
+
+medium rb {
+  model          = bound
+  atom           = Rb
+  density        = 1e18 cm^-3  # n_a = 5.7e-4 n_c at 800 nm
+  ionization     = adk
+  electrons      = electrons
+  ions           = rb_ions
+  ionization_ppc = 4
+  n_phi          = 8
+  profile        = z > 3 um && z < 9 um && r < 2.4 um
+}
+
+output {
+  dir   = out_rz_rb
+  every = 40
+}

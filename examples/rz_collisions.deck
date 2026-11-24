@@ -1,0 +1,60 @@
+# Binary collisions in RZ (docs/specs/collisions.md, decision 94): a hydrogen plasma (n_e = 1 n_c = 1.7e21 cm^-3) with hot
+# electrons (T_e = 300 eV) and cold protons (T_i = 30 eV) relaxes; collision cells are the annuli between the radial nodes
+# (volume pi (r_{j+1}^2 - r_j^2) dz). Coulomb logarithm automatic. Periodic z, the conducting wall at r = 0.16 um.
+#   build/vlpl examples/rz_collisions.deck
+grid {
+  geometry = rz
+  modes    = 1
+  lambda0  = 0.8 um
+  nz       = 128             # 0.64 um
+  nr       = 16              # 0.16 um
+  dz       = 0.005 um
+  dr       = 0.01 um
+  t_end    = 30 fs
+}
+
+numerics {
+  shape = 2
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 1
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uth_z     = 0.0242302      # 300 eV
+  uth_x     = 0.0242302
+  uth_y     = 0.0242302
+}
+
+species protons {
+  element      = H
+  charge_state = 1
+  density      = 1
+  ppc_z        = 2
+  ppc_r        = 2
+  ppc_theta    = 8
+  uth_z        = 1.79e-4     # 30 eV
+  uth_x        = 1.79e-4
+  uth_y        = 1.79e-4
+}
+
+collisions ee {
+  species1 = electrons
+}
+
+collisions ep {
+  species1 = electrons
+  species2 = protons
+}
+
+collisions pp {
+  species1 = protons
+}
+
+output {
+  dir   = out_rz_collisions
+  every = 50
+}

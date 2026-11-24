@@ -1,0 +1,34 @@
+# RZ with azimuthal modes (docs/specs/rz_modes.md): a Gaussian pulse, polarised along x (mode m = 1),
+# focused 8 um behind the entrance, enters through the open left z edge, focuses and leaves through the
+# right edge. W_field (column 3 of out_rz_laser/diag.txt) rises to the pulse energy, stays constant while
+# the pulse is inside, and falls to ~0; max|dGauss| and max|divB| stay at round-off.
+# Run:   build/vlpl examples/rz_laser.deck
+
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 320
+  nr         = 48
+  dz         = 0.05 um
+  dr         = 0.25 um         # the wall at r = 12 um
+  boundary_z = open
+  t_end      = 100 fs
+}
+
+numerics {
+  solver = rip_cc              # dz^2 (lambda_max + wp^2) / 4 = 0.18; irip works as well
+}
+
+laser {
+  a0           = 1
+  polarization = x
+  duration     = 8 fs
+  waist        = 2 um
+  focus        = 8 um
+}
+
+output {
+  dir   = out_rz_laser
+  every = 40
+}

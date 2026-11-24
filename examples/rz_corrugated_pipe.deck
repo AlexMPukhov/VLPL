@@ -1,0 +1,70 @@
+# A relativistic bunch through a round corrugated pipe with resolved teeth (decision 105; README "Structure runs in RZ"):
+# bore radius a = 1 mm, depth h = 50 um, period p = 40 um, gap g = 20 um (teeth of 20 um), the metal given by an
+# axisymmetric function of the metal block (decision 103) with the exact phi derivative (phi_derivative = spectral). The
+# pipe starts at z = 3 mm and is 30 mm long; before it the bunch is in free space. The bunch is read from an openPMD file
+# (research/rz_structure/make_bunch.py: 100 pC electrons, gamma 2000, sigma_z 100 um, sigma_r 20 um, offset x0 = 50 um),
+# rigid (rigid_until), with its self-field; the window moves at c. Two wake probes: on the axis (W_z, and F_x of the
+# dipole) and at the offset. Reference: Bane-Stupakov (research/rz_structure/corrugated_wake.py). Result (33 min on 24
+# cores): loss factor 8.09 kV/pC/m (BS 8.08), kick factor 2.31 kV/pC/m/mm (2.42 with k1^2 = k0^2 + 2 / a^2, decision 105).
+#   python3 research/rz_structure/make_bunch.py bunch.h5 100 200000 2000 100 20 1 50
+#   build/vlpl examples/rz_corrugated_pipe.deck "species bunch.file=bunch.h5"
+#   python3 research/rz_structure/corrugated_wake.py <output dir> 50
+grid {
+  geometry   = rz
+  modes      = 2                 # m = 0 (loss factor) and m = 1 (dipole kick)
+  lambda0    = 100 um
+  nz         = 1500              # 3 mm window
+  nr         = 300
+  dz         = 2 um              # p = 20 dz, g = 10 dz
+  dr         = 5 um              # a = 200 dr, h = 10 dr; R = 1.5 mm
+  boundary_z = open
+  boundary_r = absorbing
+  r_absorber_cells = 40          # 1.3 .. 1.5 mm, outside the metal r > 1.05 mm
+  t_end      = 100 ps            # the bunch centre from z = 2.5 mm to 32.5 mm
+}
+
+numerics {
+  solver = rip_cc
+  pusher = boris
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+metal {
+  # the pipe wall r > b = 1.05 mm and the teeth a < r < b where (z - 3 mm) mod 40 um >= 20 um, for 3 mm <= z < 33 mm
+  function = z >= 3 mm && z < 33 mm && (r > 1.05 mm || (r > 1 mm && (z - 3 mm - 40 um * floor((z - 3 mm) / (40 um))) >= 20 um))
+  phi_derivative = spectral      # axisymmetric metal: the exact m (decision 103)
+}
+
+species bunch {
+  file        = bunch.h5
+  z_center    = 2.5 mm           # the charge centroid at t = 0
+  self_field  = true
+  rigid_until = 200 ps           # rigid: momenta frozen for the whole run
+}
+
+wake axis {
+  x     = 0 um
+  y     = 0 um
+  every = 5000
+}
+
+wake offset {
+  x     = 50 um                  # at the bunch offset: W_x of the dipole mode
+  y     = 0 um
+  every = 5000
+}
+
+beam_slices bunch {
+  species = bunch
+  dx      = 20 um
+  every   = 5000
+}
+
+output {
+  dir   = rz_corrugated_pipe_out
+  every = 1000000
+}

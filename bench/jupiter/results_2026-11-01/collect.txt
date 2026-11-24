@@ -1,0 +1,16 @@
+| case | run | ranks (x y z) | steps | s/step | speed-up | efficiency | per operator, ms/step |
+|---|---|---|---|---|---|---|---|
+| bubble_strong | 1 GPU | 1x1x1 | 1799 | 0.0641 |  |  | push_deposit 56.88, rip_cc 1.88, moving_window 0.27, migrate 4.92, beam_diag 0.01, other 0.19 |
+| bubble_strong | 4 GPU | 2x2x1 | 1799 | 0.0377 | 1.70 | 42 % | push_deposit 19.06, rip_cc 7.76, moving_window 0.82, migrate 10.06, beam_diag 0.01, other 0.07 |
+| bubble_strong | 16 GPU | 4x2x2 | 1799 | 0.0193 | 3.32 | 21 % | push_deposit 5.70, rip_cc 4.98, moving_window 0.33, migrate 8.31, beam_diag 0.01, other 0.03 |
+| bubble_strong | CPU 4x72 | 2x2x1 | 1799 | 0.3120 | 0.206 |  | push_deposit 165.53, rip_cc 17.57, moving_window 1.15, migrate 12.07, tile_sort 114.51, beam_diag 0.04, other 1.16 |
+| bubble_weak | 1 GPU | 1x1x1 | 1799 | 0.0635 |  |  | push_deposit 56.27, rip_cc 1.87, moving_window 0.27, migrate 4.92, beam_diag 0.01, other 0.19 |
+| bubble_weak | 4 GPU | 1x2x2 | 1799 | 0.0952 |  | 67 % (weak) | push_deposit 62.88, rip_cc 21.06, moving_window 0.73, migrate 10.29, beam_diag 0.01, other 0.22 |
+| bubble_weak | 16 GPU | 1x4x4 | 1799 | 0.0885 |  | 72 % (weak) | push_deposit 61.06, rip_cc 15.41, moving_window 0.71, migrate 11.12, beam_diag 0.01, other 0.23 |
+| rz_nm10 | 1 GPU | 1x1x1 | 2600 | 0.0174 |  |  | rz_push_deposit 13.17, rz_fields 2.72, moving_window 0.55, migrate 0.81, other 0.13 |
+| rz_nm10 | 4 GPU | 4x1x1 | 2600 | 0.0132 | 1.31 | 33 % | rz_push_deposit 5.69, rz_fields 4.47, moving_window 0.34, migrate 2.68, other 0.05 |
+| rz_nm10 | 16 GPU | 16x1x1 | 2600 | 0.0099 | 1.75 | 11 % | rz_push_deposit 2.42, rz_fields 5.16, moving_window 0.35, migrate 1.95, other 0.05 |
+| rz_nm10 | CPU 4x72 | 4x1x1 | 2600 | 0.1472 | 0.118 |  | rz_push_deposit 140.26, rz_fields 3.48, moving_window 0.57, migrate 1.59, other 1.25 |
+
+speed-up: t(1 GPU) / t; for the CPU rows t(1 GPU) / t(CPU node), i.e. < 1 when one GPU is faster than the node.
+weak: bubble_weak on N GPUs has N times the cells and particles of bubble_strong on 1 GPU (efficiency t1 / tN).

@@ -1,0 +1,75 @@
+# Flying focus in a preformed plasma (decision 63): the luminal Bessel pulse of the plasma fed through the faces of the
+# side TFSF tube, kinetic electrons inside the tube, the cold fluid outside it; against GEM-PIC-RZ (gem_plasma.deck, the
+# same pulse with flying_focus.background_density). Scaled down from GEM-PIC-RZ benchmarks/flying_focus/plasma.deck
+# for 3D: n_e = 1e18 cm^-3 (lambda_p = 33 um), a0 = 2 on the axis, cone 0.2 rad (core radius 1.5 um), 30 fs, 72 um
+# window, 0.3 mm. The electrons start at rest inside the pulse: compare after the window has moved its length.
+#   build/vlpl bench/flying_focus/rip_plasma.deck && python3 bench/flying_focus/check_plasma.py rip_ffp_out gem_ffp_out
+grid {
+  lambda0    = 0.8 um
+  nx         = 2160            # 72 um, lambda / 24 (c dt = dx)
+  ny         = 80              # 32 um, dy = lambda_perp / 10
+  nz         = 80
+  dx         = 0.03333 um
+  dy         = 0.4 um
+  dz         = 0.4 um
+  boundary_x = open
+  boundary_y = pml
+  boundary_z = pml
+  t_end      = 1000 fs         # 0.3 mm
+}
+
+pml {
+  cells = 10
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+side {
+  wave               = flying_focus
+  a0                 = 2
+  cone_angle         = 200 mrad
+  duration           = 30 fs   # intensity FWHM on the axis (1/e half length of the field 7.6 um)
+  x_center           = 42 um
+  y_center           = 16.2 um # the axis on Ey's half node (j = 40) and the slice plane (k = 40)
+  z_center           = 16.0 um
+  polarization       = y
+  background_density = 5.741e-4    # 1e18 cm^-3 in n_c at 0.8 um
+}
+
+species electrons {            # the kinetic region: particles 5.6 .. 26 um (2 cells inside the faces), the fluid outside
+  charge  = -1
+  mass    = 1
+  density = 5.741e-4
+  ppc_x   = 1
+  ppc_y   = 2
+  ppc_z   = 2
+  ymin    = 5.6 um
+  ymax    = 26.0 um
+  zmin    = 5.6 um
+  zmax    = 26.0 um
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  mobile  = false
+  density = 5.741e-4
+  ppc_x   = 1
+  ppc_y   = 2
+  ppc_z   = 2
+  ymin    = 5.6 um
+  ymax    = 26.0 um
+  zmin    = 5.6 um
+  zmax    = 26.0 um
+}
+
+output {
+  dir          = rip_ffp_out
+  every        = 300
+  slice_every  = 900           # every 30 um of propagation
+  slice_z      = 16.0 um
+  slice_fields = Ex Ey n_electrons
+}

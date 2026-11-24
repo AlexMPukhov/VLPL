@@ -1,0 +1,56 @@
+# Handover test 3 (bench/rz_dielectric/README.md): Cherenkov radiation of a rigid 100 pC bunch (gamma = 1000, sigma_z 10 um,
+# sigma_r 5 um) entering an open dielectric eps = 1.3 (r < 0.5 mm, beyond the radial absorber) at z = 0.95 mm. At the lab
+# plane z = 2.45 mm (1.5 mm inside) the field front arrives at t(r) = (z + r sqrt(eps beta^2 - 1)) / (beta c): cherenkov.py
+# fits the arrival time of the peak of B_phi against r (cone angle cos theta = 1 / (n beta)).
+#   build/vlpl bench/rz_dielectric/cherenkov.deck  &&  python3 bench/rz_dielectric/cherenkov.py out_cherenkov 1.3
+grid {
+  geometry   = rz
+  modes      = 1
+  lambda0    = 100 um
+  nz         = 1250              # 1 mm window
+  nr         = 432
+  dz         = 0.8 um
+  dr         = 1 um              # R = 432 um; absorber 32 cells
+  boundary_z = open
+  boundary_r = absorbing
+  t_end      = 6.6 ps
+}
+
+numerics {
+  solver = rip_cc
+  pusher = boris
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+dielectric bulk {
+  r_in    = 0 um
+  r_out   = 0.5 mm
+  z_start = 0.95 mm
+  z_end   = 100 mm
+  eps     = 1.3
+}
+
+species bunch {
+  charge     = 1
+  mass       = 18361526.7        # proton mass x 1e4 (rigid)
+  density    = 1.42186           # 100 pC
+  density_function = gauss(z - 0.85 mm, 10 um) * gauss(r, 5 um)
+  zmin       = 0.81 mm
+  zmax       = 0.89 mm
+  rmax       = 20 um
+  uz         = 999.9995          # gamma = 1000
+  self_field = true
+  ppc_z      = 1
+  ppc_r      = 2
+  ppc_theta  = 1
+}
+
+output {
+  dir        = out_cherenkov
+  every      = 1000
+  plane_z    = 2.45 mm
+}

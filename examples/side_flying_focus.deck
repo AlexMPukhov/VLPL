@@ -1,0 +1,41 @@
+# A flying focus (luminal Bessel pulse) fed through the faces of the side TFSF tube (docs/specs/side_injection.md,
+# decision 62) in a vacuum window moving at c from t = 0. The pattern is stationary in the window: the field energy
+# stays constant, on the axis the analytic pulse E_y = a0 exp(-zeta'^2/L^2) cos(cos(theta) k0 zeta' - kappa omega0 t)
+# (bench/flying_focus/ for a longer run against GEM-PIC-RZ).
+#   build/vlpl examples/side_flying_focus.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 480             # 24 um, 16 cells per wavelength (c dt = dx)
+  ny         = 48
+  nz         = 48
+  dx         = 0.05 um
+  dy         = 0.1 um
+  dz         = 0.1 um
+  boundary_x = open
+  boundary_y = pml
+  boundary_z = pml
+  t_end      = 20 fs
+}
+
+pml {
+  cells = 8
+}
+
+window {
+  start    = 0 fs              # at c from t = 0: needed by the tabulated flying focus
+  velocity = 1
+}
+
+side {
+  wave         = flying_focus
+  a0           = 1
+  cone_angle   = 20 deg        # core radius 0.9 um, transverse wavelength 2.3 um
+  length_1e    = 1.8 um        # 1/e half length of the field on the axis
+  x_center     = 12 um         # the envelope centre at t = 0, 12 um from both ends of the window
+  polarization = y
+}
+
+output {
+  dir   = out_side_ff
+  every = 20
+}

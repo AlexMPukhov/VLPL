@@ -1,0 +1,40 @@
+# Linear NCI test on a boosted-LWFA grid (bench/nci/boost_stability/README.md): neutral e-p plasma streaming along -x through a
+# periodic box; dx, dy, density, ux, t_end set on the command line by the scan script.
+grid {
+  geometry   = cartesian2d
+  lambda0    = 1 um
+  nx         = 64
+  ny         = 32
+  dx         = 0.6234 um
+  dy         = 0.25 um
+  boundary_x = periodic
+  t_end      = 2.5 ps
+}
+numerics {
+  solver = irip
+  shape  = 1
+  pusher = higuera_cary
+}
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.04
+  ppc_x   = 2
+  ppc_y   = 2
+  ux      = -9.95
+  uth_x   = 1e-2
+  uth_y   = 1e-2
+  uth_z   = 1e-2
+}
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.04
+  ppc_x   = 2
+  ppc_y   = 2
+  ux      = -9.95
+}
+output {
+  dir   = out_lin
+  every = 10
+}

@@ -1,0 +1,32 @@
+# Public checks on GitHub-hosted runners: the CPU build, the unit tests and the regression harness on every push and
+# pull request; the MPI rank-count check (tests/mpi.sh, about 15 min) only when started by hand. GPU builds are tested
+# on the developers' machines (README "CPU and GPU").
+name: ci
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md', 'research/**', 'bench/**']
+  pull_request:
+    paths-ignore: ['docs/**', '**/*.md', 'research/**', 'bench/**']
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cpu:
+    runs-on: ubuntu-24.04
+    env:
+      OMP_PROC_BIND: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -j4 HDF5=0
+      - run: make test HDF5=0
+      - run: make regression HDF5=0
+  mpi:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -y -q openmpi-bin libopenmpi-dev
+      - run: make -j4 MPI=1 HDF5=0 BUILD=build-mpi
+      - run: sh tests/mpi.sh build-mpi/vlpl

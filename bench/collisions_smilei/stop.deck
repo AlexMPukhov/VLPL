@@ -1,0 +1,81 @@
+# VLPL side of the collision benchmark "stop" against Smilei 5.1 (bench/collisions_smilei/README.md): the parameters of
+# smilei_coll.py (CASE=stop), frozen species (mobile = false): only the collisions act. Output: collisions.txt.
+grid {
+  geometry = cartesian2d
+  lambda0 = 1 um
+  nx = 10
+  ny = 4
+  dx = 1 um
+  dy = 2 um
+  dz = 1 um
+  t_end = 166.782 fs
+}
+numerics {
+  seed = 7
+}
+species background {
+  charge = -1
+  mass = 1
+  mobile = false
+  density = 10
+  ppc_x = 50
+  ppc_y = 60
+  uth_x = 0.1
+  uth_y = 0.1
+  uth_z = 0.1
+}
+species beam0 {
+  charge = -1
+  mass = 1
+  mobile = false
+  density = 1e-5
+  ppc_x = 50
+  ppc_y = 60
+  ux = 0.204124145
+  uth_x = 0.000316227766
+  uth_y = 0.000316227766
+  uth_z = 0.000316227766
+}
+species beam1 {
+  charge = -1
+  mass = 1
+  mobile = false
+  density = 1e-5
+  ppc_x = 50
+  ppc_y = 60
+  ux = 0.280418692
+  uth_x = 0.000316227766
+  uth_y = 0.000316227766
+  uth_z = 0.000316227766
+}
+species beam2 {
+  charge = -1
+  mass = 1
+  mobile = false
+  density = 1e-5
+  ppc_x = 50
+  ppc_y = 60
+  ux = 0.349584038
+  uth_x = 0.000316227766
+  uth_y = 0.000316227766
+  uth_z = 0.000316227766
+}
+collisions b0 {
+  species1 = background
+  species2 = beam0
+  coulomb_log = 3
+}
+collisions b1 {
+  species1 = background
+  species2 = beam1
+  coulomb_log = 3
+}
+collisions b2 {
+  species1 = background
+  species2 = beam2
+  coulomb_log = 3
+}
+output {
+  dir = out_vlpl_stop
+  every = 2
+}

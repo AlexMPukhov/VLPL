@@ -1,0 +1,81 @@
+# The first version of the benchmark deck, with the incident grid of the TFSF source (laser.tfsf_incident = grid): the
+# pulse must fit between the left absorber and the plane at t = 0 (~17 um at 45 deg), so the box is 29.5 um long. Kept
+# for the comparison with the plane-wave source (rip.deck); its beam is uniform in z (no waist_z), unlike Smilei's.
+#
+# A p-polarised pulse at 45 deg to x enters through the TFSF plane and hits an overdense foil whose normal is tilted by
+# 22.5 deg: incidence 22.5 deg, the specular reflection and its harmonics leave along -x and are recorded at the inner
+# face of the left absorber (output.xflux_every, tools/xflux.py).
+# As written: the code check of Alexander (6 n_c, a0 = 2, lambda0/32 x lambda0/16). The production case (100 n_c, a0 = 10)
+# needs lambda0/64 x lambda0/32 or finer (omega_p dt < 2) and the corresponding density, a0 and grid overrides, e.g.
+#   vlpl rip.deck grid.nx=3688 grid.ny=1781 grid.nz=625 grid.dx=0.008um grid.dy=0.016um grid.dz=0.016um
+#          output.xflux_every=2 output.dir=out_100
+# Coordinates (um): left absorber 0-2, the pulse starts in 2-20.5 (at 45 deg it spans ~17 um in x and y to 1e-4),
+# TFSF plane x = 20.5, the beam axis crosses it at y = 17.5 and hits the foil at (24.5, 21.5); right absorber 27.5-29.5.
+grid {
+  lambda0    = 0.8 um
+  nx         = 1180            # 29.5 um, dx = lambda0 / 32
+  ny         = 570             # 28.5 um, periodic
+  nz         = 200             # 10 um, periodic
+  dx         = 0.025 um
+  dy         = 0.05 um
+  dz         = 0.05 um
+  boundary_x = absorbing
+  x_absorber_width = 2 um
+  t_end      = 165 fs
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 2
+  polarization = y             # p: in the plane of incidence (x, y)
+  duration     = 13 fs         # FWHM of the intensity
+  delay        = 43 fs         # the peak crosses the plane at (20.5, 17.5) um then; the pulse lies in 2 < x < 20.5 at t = 0
+  waist        = 2 um
+  focus        = 5.657 um      # along the beam beyond the plane: on the foil
+  tfsf_x       = 20.5 um
+  angle        = 45 deg
+  y_center     = 17.5 um
+  z_center     = 5 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 6                  # n_c (code check, Alexander 2026-11-01; production: 100 n_c, a0 = 10)
+  slab_x0 = 24.5 um
+  slab_y0 = 21.5 um
+  slab_angle = 22.5 deg        # normal into the foil; the specular direction of the 45 deg beam is -x
+  slab_thickness = 0.6 um
+  slab_ramp = 0.08 um          # pre-plasma L = lambda0 / 10
+  slab_ramp_extent = 0.4 um    # cut at 5 L (1 n_c)
+  ymin    = 17.5 um              # foil 8 um long in y (4 waists)
+  ymax    = 25.5 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 6
+  slab_x0 = 24.5 um
+  slab_y0 = 21.5 um
+  slab_angle = 22.5 deg
+  slab_thickness = 0.6 um
+  slab_ramp = 0.08 um
+  slab_ramp_extent = 0.4 um
+  ymin    = 17.5 um
+  ymax    = 25.5 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+output {
+  dir   = out_32
+  every = 100
+  xflux_every = 1
+}

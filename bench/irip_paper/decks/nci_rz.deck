@@ -1,0 +1,46 @@
+# NCI streaming-plasma test (paper Sec. 8.2, task 6) in VLPL-RZ / VLPL-iRZ, modes m = 0, 1.
+# As examples/streaming_plasma.deck (Pukhov 2020, Sec. 7.1): neutral e-p plasma, n = 0.01 n_c (c/wp = 10/k0),
+# drift u = -10 along z (gamma 10; override uz = -50 for gamma 50), u_th = 1e-4, linear shapes, periodic z,
+# dz = c dt = 0.63 c/wp; dr = 3 c dt (coarse, nr = 16) or c dt / 4 (fine: dr = 0.25068 um, nr = 64).
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 1 um
+  nz         = 64
+  nr         = 16
+  dz         = 1.0027 um      # 6.3 / k0 = 0.63 c/wp
+  dr         = 3.0081 um      # 3 dz
+  boundary_z = periodic
+  boundary_r = wall
+  t_end      = 1.5 ps         # 280 / wp
+}
+numerics {
+  solver = irip
+  shape  = 1
+  pusher = higuera_cary
+}
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.01
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uz        = -10
+  uth_z     = 1e-4
+  uth_x     = 1e-4
+  uth_y     = 1e-4
+}
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.01
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uz        = -10
+}
+output {
+  dir   = out_nci_rz
+  every = 7                    # rz_modes.txt: W per mode
+}

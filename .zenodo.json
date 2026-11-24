@@ -1,0 +1,13 @@
+{
+  "title": "VLPL: electromagnetic particle-in-cell code with the RIP / iRIP field solvers",
+  "upload_type": "software",
+  "description": "VLPL is an electromagnetic particle-in-cell code (3D, 2D and quasi-3D RZ) built on the RIP family of Maxwell solvers: RIP-CC (explicit, no numerical dispersion along the propagation axis, exactly charge conserving) and iRIP (implicit). CPU (OpenMP) and GPU (CUDA) from one source, MPI domain decomposition, moving window, boosted frame, field ionization, collisions, QED, openPMD output.",
+  "creators": [
+    {"name": "Pukhov, Alexander", "affiliation": "Heinrich-Heine-Universität Düsseldorf", "orcid": "0000-0001-5043-960X"}
+  ],
+  "license": "BSD-3-Clause",
+  "keywords": ["particle-in-cell", "plasma physics", "laser-plasma interaction", "Maxwell solver", "GPU"],
+  "related_identifiers": [
+    {"identifier": "10.1016/j.jcp.2020.109622", "relation": "isDocumentedBy", "resource_type": "publication-article"}
+  ]
+}

@@ -1,0 +1,75 @@
+# Case B in 3D (VLPL-RIP; VLPL-iRIP with numerics.solver = irip): rz_wake.deck on a Cartesian grid, periodic in y, z
+# (12 um). Laser a0 = 1, 10 fs, waist 4 um, 0.01 n_c in a matched parabolic channel
+# (dn/n0 = 0.405 at r = w0, cut at r = 6 um in 3D); witness 10 MeV, 1 pC, eps_n = 0.1 um, sigma_r = 0.30 um (matched),
+# sigma_z = 0.3 um, loaded at 150 fs 4.5 um behind the pulse centre with its self-field; 0.5 mm.
+#   build/vlpl bench/emittance/wake.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 320             # 16 um, dx = lambda / 16 (c dt = dx)
+  ny         = 160             # 12 um, periodic (+-1.5 w0: 1 % of the laser intensity at the edge)
+  nz         = 160
+  dx         = 0.05 um
+  dy         = 0.075 um
+  dz         = 0.075 um
+  boundary_x = open
+  t_end      = 1700 fs         # 0.5 mm
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 1
+  polarization = z
+  duration     = 10 fs         # intensity FWHM; delay 20 fs
+  waist        = 4 um          # focus at x = 0, centred in y and z
+  waist_z      = 4 um
+}
+
+window {
+  start = 45 fs                # the pulse centre 5.3 um behind the front edge, the first bucket in the box
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.01
+  xmin    = 13 um
+  density_function = (x < 20 um ? (x - 13 um) / (7 um) : 1) * (1 + 0.405 * (sqrt((y - 6 um)^2 + (z - 6 um)^2) < 6 um ? sqrt((y - 6 um)^2 + (z - 6 um)^2) : 6 um)^2 / (4 um)^2)
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.01
+  xmin    = 13 um
+  density_function = (x < 20 um ? (x - 13 um) / (7 um) : 1) * (1 + 0.405 * (sqrt((y - 6 um)^2 + (z - 6 um)^2) < 6 um ? sqrt((y - 6 um)^2 + (z - 6 um)^2) : 6 um)^2 / (4 um)^2)
+}
+
+species beam {
+  charge  = -1
+  mass    = 1
+  density = 0.00807            # 1 pC: Q / (e (2 pi)^1.5 sigma_r^2 sigma_z) = 1.41e19 cm^-3
+  ux      = 20.55              # 10 MeV
+  uth_y   = 0.333              # eps_n = sigma_r sigma_u = 0.1 um
+  uth_z   = 0.333
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  density_function = gauss(x - 34.3 um, 0.3 um) * gauss(sqrt((y - 6 um)^2 + (z - 6 um)^2), 0.30 um) * (abs(x - 34.3 um) < 0.9 um) * (sqrt((y - 6 um)^2 + (z - 6 um)^2) < 0.9 um)
+  self_field = true
+  t_start    = 150 fs
+}
+
+diagnostic beam {
+  species   = beam
+  every     = 200
+  bins      = 0
+}
+
+output {
+  dir   = out_wake
+  every = 200
+}

@@ -1,0 +1,75 @@
+# Plain laser wakefield in RZ (VLPL-RZ), lab frame: a0 = 2, 0.8 um, matched spot 15 um, 37 fs, in 1e18 cm^-3 with a
+# 70 um up-ramp, 0.3 mm of plasma, window moving at c. Every number below is the output of
+#   python3 scripts/vlpl_numbers.py --density 1e18 --a0 2 --length 0.3
+# (plasma wavelength 33.4 um, c/omega_p 5.3 um, Rayleigh length 0.89 mm, P = 1.0 P_c, omega_p dt = 0.0094).
+# No injected beam: the trapped charge above gamma = 20 is reported in beam_trapped.txt (it stays empty at a0 = 2).
+# Result: 9833 steps in 44 min on 24 cores; E_z on the axis at 1.5 ps: -0.87 E0 behind the pulse (E0 = 96 GV/m);
+# max|dGauss| 6e-15.
+#   build/vlpl lwfa_plain_rz.deck --check
+#   OMP_NUM_THREADS=8 build/vlpl lwfa_plain_rz.deck
+#   python3 scripts/quick_look.py out_lwfa_plain_rz
+grid {
+  geometry   = rz
+  modes      = 2               # m = 0 (wake) and m = 1 (the linearly polarized laser)
+  lambda0    = 0.8 um
+  nz         = 1904            # window 95.2 um: the pulse and 1.5 plasma periods behind it
+  dz         = 0.05 um         # lambda0 / 16 (c dt = dz); lambda0 / 32 for quantitative results
+  nr         = 96              # 72 um: plasma to 48 um, then vacuum and the absorber
+  dr         = 0.75 um         # waist / 20, (c / omega_p) / 7
+  boundary_z = open
+  boundary_r = absorbing       # the outer 32 cells absorb the light that leaves sideways
+  t_end      = 1640 fs         # 9833 steps
+}
+
+numerics {
+  solver = rip_cc              # explicit: dz << dr
+  shape  = 2
+}
+
+laser {
+  a0           = 2
+  polarization = x
+  duration     = 37.13 fs      # FWHM of the intensity, c tau = lambda_p / 3
+  waist        = 15.03 um      # matched: k_p w = 2 sqrt(a0)
+  focus        = 167.2 um      # at the end of the up-ramp
+}
+
+window {
+  start    = 315 fs            # >= 2 x delay (148.5 fs: the pulse is in) and < box / c (317.5 fs: its head is still inside)
+  velocity = 1
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 5.741e-4         # 1e18 cm^-3 in n_c = 1.742e21 cm^-3
+  zmin      = 97.2 um          # ahead of the box when the window starts
+  rmax      = 48 um
+  density_function = z < 167.2 um ? (z - 97.2 um) / (70 um) : 1
+  ppc_r     = 2
+  ppc_theta = 6                # 2 (2 modes - 1)
+}
+
+species ions {
+  charge    = 1
+  mass      = 1836
+  density   = 5.741e-4
+  zmin      = 97.2 um
+  rmax      = 48 um
+  density_function = z < 167.2 um ? (z - 97.2 um) / (70 um) : 1
+  ppc_r     = 2
+  ppc_theta = 6
+}
+
+diagnostic trapped {
+  species   = electrons
+  gamma_min = 20
+  every     = 1000
+}
+
+output {
+  dir        = out_lwfa_plain_rz
+  every      = 200             # diag.txt
+  axis_every = 1000            # E_z on the axis -> plane/axis_r*.bin (scripts/quick_look.py)
+  # openpmd_every = 2000       # fields and particles (needs a build with HDF5)
+}

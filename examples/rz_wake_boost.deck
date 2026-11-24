@@ -1,0 +1,54 @@
+# The RZ wake of tests/test_boost.cpp (B2) as a deck, for timings (docs/specs/boosted_frame.md): a0 = 1, 12 fs, waist 4 um,
+# 0.005 n_c from z = 30 um, lab dz = lambda/32, iRIP, window at c, lab time 130 um / c. The lab run of the same deck:
+#   build/vlpl examples/rz_wake_boost.deck boost.enabled=false output.dir=out_rz_wake_lab
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 960            # 24 um
+  nr         = 50
+  dz         = 0.025 um       # lambda / 32 (lambda / 16 drives the boosted wake 15-21 % too strong, decision 87)
+  dr         = 0.4 um
+  boundary_z = open
+  t_end      = 433.6 fs       # 130 um / c
+}
+boost {
+  gamma = 2
+}
+lab_diagnostics {
+  t_first = 433.6 fs
+}
+numerics {
+  solver = irip
+}
+laser {
+  a0           = 1
+  polarization = y
+  duration     = 12 fs
+  delay        = 24 fs
+  waist        = 4 um
+  focus        = 15 um
+}
+window {
+  start = 79 fs
+}
+species e {
+  charge    = -1
+  mass      = 1
+  density   = 0.005
+  zmin      = 30 um
+  ppc_r     = 1
+  ppc_theta = 6
+}
+species p {
+  charge    = 1
+  mass      = 1836
+  density   = 0.005
+  zmin      = 30 um
+  ppc_r     = 1
+  ppc_theta = 6
+}
+output {
+  dir   = out_rz_wake_boost
+  every = 100
+}

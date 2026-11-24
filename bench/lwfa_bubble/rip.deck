@@ -1,0 +1,69 @@
+# Strongly nonlinear LWFA (bubble) benchmark against FBPIC (bench/lwfa_bubble/README.md): a0 = 4,
+# 20 fs (intensity FWHM), waist 7.2 um (matched, k_p w0 = 2 sqrt(a0)) focused at x = 0, plasma
+# 0.005 n_c (8.7e18 cm^-3, lambda_p = 11.3 um) with a linear up-ramp 32 -> 52 um, mobile protons,
+# moving window from 100 fs (laser 3.3 sigma behind the front edge). The same lab-frame setup as fbpic_bubble.py; compare.py compares the
+# bubble (length, accelerating field, cavity), the on-axis Ex of the first bucket and the laser.
+grid {
+  lambda0    = 0.8 um
+  nx         = 600             # 30 um, dx = lambda / 16 (c dt = dx)
+  ny         = 160             # 40 um (periodic; FBPIC: r_max = 20 um)
+  nz         = 160
+  dx         = 0.05 um
+  dy         = 0.25 um
+  dz         = 0.25 um
+  boundary_x = open
+  t_end      = 1000.5 fs       # 6000 steps; the laser is then ~236 um into the plateau
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 4
+  polarization = z
+  duration     = 20 fs         # intensity FWHM (FBPIC tau = 20 fs / sqrt(2 ln 2)); delay 40 fs
+  waist        = 7.2 um        # focus at x = 0, centred in y and z
+  waist_z      = 7.2 um
+}
+
+window {
+  start = 99.8 fs              # laser centre 12 um = 3.3 sigma (field rms 12 fs) behind the front edge; c start + dx <= box length
+                               # (the head of the pulse injected from t = 0 must not pass the edge before the first shift, decision 91;
+                               # 100 fs = L / c cut it: 1.05e-4 in the Gauss law and div B); box [0.06, 30.06 um] then (FBPIC [0, 30 um])
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.005              # n_c
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  xmin    = 32 um              # ahead of the box when the window starts (exact Gauss law)
+  density_function = x < 52 um ? (x - 32 um) / (20 um) : 1
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.005
+  xmin    = 32 um
+  density_function = x < 52 um ? (x - 32 um) / (20 um) : 1
+}
+
+diagnostic injected {          # self-injected electrons: gamma >= 20 (laser quiver: gamma < 1 + a0^2/2 = 9)
+  species   = electrons
+  every     = 600
+  gamma_min = 20
+  bins      = 200
+  e_max_mev = 400
+}
+
+output {
+  dir          = out_bubble_rip
+  every        = 60
+  slice_every  = 600           # 100 fs
+  slice_fields = Ex Ez n_electrons
+}

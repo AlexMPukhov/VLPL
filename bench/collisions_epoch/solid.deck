@@ -1,0 +1,54 @@
+# VLPL side of the solid-density benchmark (bench/collisions_epoch/README.md): hydrogen at n_e = n_i = 100 n_c (lambda = 1 um:
+# 1.1e23 cm^-3), T_e = 100 eV, T_i = 10 eV, lnL = 5 for e-e, e-p, p-p; frozen species (only the collisions act), 0.5 ps.
+grid {
+  geometry = cartesian2d
+  lambda0  = 1 um
+  nx       = 12
+  ny       = 4
+  dx       = 0.0031831 um      # c dt = 0.02 / k0: s ~ 0.02 per e-p pair at the thermal speed
+  dy       = 0.0063662 um
+  dz       = 1 um
+  t_end    = 500 fs
+}
+numerics {
+  seed = 7
+}
+species electron {
+  charge = -1
+  mass   = 1
+  mobile = false
+  density = 100
+  ppc_x  = 20
+  ppc_y  = 25
+  uth_x  = 0.0139890       # 100 eV
+  uth_y  = 0.0139890
+  uth_z  = 0.0139890
+}
+species proton {
+  charge = 1
+  mass   = 1836.15267
+  mobile = false
+  density = 100
+  ppc_x  = 20
+  ppc_y  = 25
+  uth_x  = 1.03236e-4      # 10 eV
+  uth_y  = 1.03236e-4
+  uth_z  = 1.03236e-4
+}
+collisions ee {
+  species1    = electron
+  coulomb_log = 5
+}
+collisions ep {
+  species1    = electron
+  species2    = proton
+  coulomb_log = 5
+}
+collisions pp {
+  species1    = proton
+  coulomb_log = 5
+}
+output {
+  dir   = out_vlpl_solid
+  every = 500
+}

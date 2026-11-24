@@ -1,0 +1,50 @@
+# RZ with azimuthal modes (docs/specs/rz_modes.md): a hot plasma column in a conducting cylinder,
+# periodic z, iRIP with dz = 2 dr. Electrons reach the wall and are absorbed; the Gauss law per mode
+# (max|dGauss|, column 6 of out_rz/diag.txt) stays at round-off, W_total drifts only by the heating.
+# Run:   build/vlpl examples/rz_plasma.deck
+
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 1 um
+  nz         = 64
+  nr         = 32
+  dz         = 0.2 um
+  dr         = 0.1 um          # the wall at r = 3.2 um
+  boundary_z = periodic
+  t_end      = 200 fs
+}
+
+numerics {
+  solver = irip
+  pusher = boris
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.01
+  rmax      = 2.5 um
+  ppc_z     = 1
+  ppc_r     = 2
+  ppc_theta = 8
+  uth_z     = 0.05
+  uth_x     = 0.05
+  uth_y     = 0.05
+  uz        = 0.02
+}
+
+species ions {
+  charge    = 1
+  mass      = 1836
+  density   = 0.01
+  rmax      = 2.5 um
+  ppc_z     = 1
+  ppc_r     = 2
+  ppc_theta = 8
+}
+
+output {
+  dir   = out_rz
+  every = 20
+}

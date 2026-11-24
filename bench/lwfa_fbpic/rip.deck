@@ -1,0 +1,54 @@
+# LWFA benchmark against FBPIC (bench/lwfa_fbpic/README.md): a0 = 1, 10 fs (intensity FWHM), waist
+# 4 um focused at x = 0, plasma 0.01 n_c with a linear up-ramp 13 -> 20 um, moving window from 40 fs.
+# The same lab-frame setup as fbpic_lwfa.py; compare.py compares the on-axis Ex and the laser field.
+grid {
+  lambda0    = 0.8 um
+  nx         = 256             # 12.8 um, dx = lambda / 16 (c dt = dx)
+  ny         = 72              # 18 um (periodic; FBPIC: r_max = 9 um)
+  nz         = 72
+  dx         = 0.05 um
+  dy         = 0.25 um
+  dz         = 0.25 um
+  boundary_x = open
+  t_end      = 300.3 fs        # 1800 steps
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 1
+  polarization = z
+  duration     = 10 fs         # intensity FWHM (FBPIC tau = 10 fs / sqrt(2 ln 2))
+  waist        = 4 um          # focus at x = 0, centred in y and z
+  waist_z      = 4 um          # (0 would be uniform in z)
+}
+
+window {
+  start = 40 fs                # box [0, 12.8 um] then, as FBPIC's
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.01               # n_c
+  xmin    = 13 um
+  density_function = x < 20 um ? (x - 13 um) / (7 um) : 1
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.01
+  xmin    = 13 um
+  density_function = x < 20 um ? (x - 13 um) / (7 um) : 1
+}
+
+output {
+  dir          = out_bench_rip
+  every        = 60
+  slice_every  = 300           # 50 fs
+  slice_fields = Ex Ez n_electrons
+}

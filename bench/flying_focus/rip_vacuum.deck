@@ -1,0 +1,47 @@
+# Flying focus in vacuum (docs/specs/side_injection.md): a luminal Bessel pulse fed through the faces of the side TFSF
+# tube, against GEM-PIC-RZ's flying_focus block (gem_vacuum.deck, the same pulse) and the analytic on-axis field
+#   E_y = a0 exp(-zeta'^2 / L^2) cos(cos(theta) k0 zeta' - kappa omega0 t),  zeta' = x - c t - x_center,  kappa = 1 - cos(theta).
+# Scaled down from GEM-PIC-RZ benchmarks/flying_focus/vacuum.deck for 3D: cone 0.2 rad (core radius 1.5 um, transverse
+# wavelength 4 um), 20 fs, 45 um window, 0.3 mm.
+#   build/vlpl bench/flying_focus/rip_vacuum.deck && python3 bench/flying_focus/check_rip.py rip_ff_out
+grid {
+  lambda0    = 0.8 um
+  nx         = 1350            # 45 um, lambda / 24 (c dt = dx)
+  ny         = 80              # 32 um, dy = lambda_perp / 10
+  nz         = 80
+  dx         = 0.03333 um
+  dy         = 0.4 um
+  dz         = 0.4 um
+  boundary_x = open
+  boundary_y = pml
+  boundary_z = pml
+  t_end      = 1000 fs         # 0.3 mm
+}
+
+pml {
+  cells = 10
+}
+
+window {
+  start    = 0 fs              # the window moves at c from t = 0 (needed by the tabulated flying focus)
+  velocity = 1
+}
+
+side {
+  wave         = flying_focus
+  a0           = 1
+  cone_angle   = 200 mrad
+  duration     = 20 fs         # intensity FWHM on the axis (1/e half length of the field 5.1 um)
+  x_center     = 22.5 um       # the envelope centre at t = 0
+  y_center     = 16.2 um       # the axis on Ey's half node (j = 40) and the slice plane (k = 40)
+  z_center     = 16.0 um
+  polarization = y
+}
+
+output {
+  dir          = rip_ff_out
+  every        = 300
+  slice_every  = 900           # every 30 um of propagation
+  slice_z      = 16.0 um
+  slice_fields = Ey
+}

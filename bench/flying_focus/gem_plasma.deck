@@ -1,0 +1,24 @@
+# GEM-PIC-RZ reference for bench/flying_focus/rip_plasma.deck (VLPL): the same luminal Bessel pulse in a preformed
+# plasma of 1e18 cm^-3 (a0 = 2, cone 0.2 rad, 30 fs, 72 um window, 0.3 mm), the incident wave of that plasma fed
+# through the radial absorber layer (16 ... 24 um), plasma in the whole box.
+#   gempic_rz gem_plasma.deck   (m_max = 3, 4 x 16 particles per cell: the setting of the a0 = 2 comparison)
+grid {
+  lambda0       = 0.8 um
+  m_max         = 3              # the ponderomotive force of the linear polarisation has m = 2
+  radial_grid   = uniform
+  dr            = 0.4 um         # lambda_perp / 10
+  r_max         = 24 um
+  r_absorber    = 16 um
+  dzeta         = 0.03333 um     # lambda / 24
+  window_length = 72.0 um
+  dz            = 0.5 um
+  z_end         = 0.3 mm
+}
+flying_focus { a0 = 2; cone_angle = 200 mrad; tau_fwhm = 30 fs; zeta_center = 42 um; background_density = 1e18 cm^-3 }
+plasma {
+  density = 1e18 cm^-3
+  ppc_r   = 4
+  ppc_phi = 16
+}
+output { dir = gem_ffp_out; every = 60; particles = false }
+numerics { iterations = 2 }

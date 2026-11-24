@@ -1,0 +1,57 @@
+# Laser wakefield in a moving window: a short pulse (a0 = 2.5, 10 fs, waist 4 um) enters through the
+# open left boundary, the window starts at speed c once the pulse is in (40 fs, decision 22), and the
+# plasma (n = 0.01 n_c, lambda_p ~ 8 um) enters at the right edge from x = 13 um on. The Gauss law
+# stays at round-off (max|dGauss|, column 6 of diag.txt) while plasma enters and leaves the window.
+#   build/vlpl examples/lwfa_window.deck
+#   python3 tools/movie.py out_lwfa --fields Ez n_electrons
+grid {
+  lambda0    = 0.8 um
+  nx         = 256             # 12.8 um, 16 cells per wavelength (c dt = dx)
+  ny         = 64              # 12.8 um
+  nz         = 64
+  dx         = 0.05 um
+  dy         = 0.2 um
+  dz         = 0.2 um
+  boundary_x = open
+  t_end      = 200 fs
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 2.5
+  polarization = z
+  duration     = 10 fs         # intensity FWHM; delay = 20 fs (default 2 duration)
+  waist        = 4 um          # focus at the entrance plane x = 0, centred in y and z
+  waist_z      = 4 um          # round (0 would be uniform in z)
+}
+
+window {
+  start    = 40 fs             # >= 2 delay: the pulse has entered
+  velocity = 1                 # c: one cell per step
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.01               # n_c
+  xmin    = 13 um              # absolute x: enters with the window
+  # density_function = x < 20 um ? (x - 13 um) / (7 um) : 1   # optional up-ramp (also for the protons)
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.01
+  xmin    = 13 um
+}
+
+output {
+  dir          = out_lwfa
+  every        = 20
+  slice_every  = 100
+  slice_fields = Ez Ex n_electrons
+}

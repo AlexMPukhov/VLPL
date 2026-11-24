@@ -1,0 +1,54 @@
+# Field ionization in RZ (docs/specs/field_ionization.md, decision 86): an a0 = 2 pulse polarised along x (mode m = 1) enters a
+# nitrogen gas (1e-3 n_c atoms) through the open left z edge; the ions are field-ionized (ADK, NIST energies) to N5+ and partly
+# N6+, the electrons go into `electrons`, the ionization current takes the energy from the laser (out_rz_ionization/ionization.txt).
+#   build/vlpl examples/rz_ionization.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 320             # 8 um
+  nr         = 40              # 4 um
+  dz         = 0.025 um
+  dr         = 0.1 um
+  boundary_z = open
+  boundary_r = absorbing
+  r_absorber_cells = 8
+  t_end      = 30 fs
+}
+
+numerics {
+  shape = 2
+}
+
+laser {
+  a0           = 2
+  polarization = x
+  duration     = 8 fs
+  waist        = 1.5 um
+  focus        = 4 um
+}
+
+species nitrogen {
+  element              = N
+  ionization           = adk
+  ionization_electrons = electrons
+  density              = 1e-3
+  zmin                 = 2 um
+  zmax                 = 7 um
+  rmax                 = 3 um
+  ppc_r                = 2
+  ppc_theta            = 8
+  mobile               = false
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0
+  ppc_theta = 8
+}
+
+output {
+  dir   = out_rz_ionization
+  every = 40
+}

@@ -1,0 +1,61 @@
+# Field ionization in RZ in the Lorentz-boosted frame (docs/specs/field_ionization.md, boosted_frame.md, decision 90): an
+# 8 fs pulse (a0 = 0.0105, waist 10 um, polarised along x: mode m = 1) through a nitrogen slab (lab z in [60, 66] um, r < 2 um,
+# 1e-4 n_c atoms), run in the frame boosted by gamma = 2 along z. The ions stream at -0.866 c; the ADK rate is taken from |E|
+# in the ion's rest frame over its proper time, so the charge states after the pulse are those of the lab run
+# (boost.enabled = false; tests/test_boost.cpp B4: N1+ 0.4552 boosted vs 0.4578 lab, 0.9 sigma).
+# out_rz_ionization_boost/ionization.txt: events and charge states (E_ion = gamma_ion I_k w, the
+# energy taken in this frame).
+#   build/vlpl examples/rz_ionization_boost.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 2800            # 70 um (lab), lambda0 / 32
+  nr         = 72              # 28.8 um: the beam at its boosted entrance events (lab z down to -62 um) is up to 10.5 um wide
+  dz         = 0.025 um
+  dr         = 0.4 um
+  boundary_z = open
+  t_end      = 257.5 fs        # lab time
+}
+
+numerics {
+  solver = irip
+}
+
+laser {
+  a0           = 0.0105
+  polarization = x
+  duration     = 8 fs
+  delay        = 16 fs
+  waist        = 10 um
+  focus        = 63 um
+}
+
+species nitrogen {
+  element              = N
+  ionization           = adk
+  ionization_electrons = electrons
+  density              = 1e-4
+  zmin                 = 60 um
+  zmax                 = 66 um
+  rmax                 = 2 um
+  ppc_z                = 32
+  ppc_r                = 2
+  ppc_theta            = 8
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0
+  ppc_theta = 8
+}
+
+boost {
+  gamma = 2
+}
+
+output {
+  dir   = out_rz_ionization_boost
+  every = 50
+}

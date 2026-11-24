@@ -1,0 +1,66 @@
+# A small 3D laser wakefield in a Lorentz-boosted frame (docs/specs/boosted_frame.md), RIP-CC: the deck is a lab deck
+# plus the blocks boost and lab_diagnostics. gamma = 2 stretches dx to 0.187 um (dx^2 (1/dy^2 + 1/dz^2) = 0.28, RIP-CC
+# stable); the plasma (at rest in the lab from x = 7 um) streams through the window at -0.866 c; lab_diagnostics writes
+# the lab-frame fields at 80, 110, 140 fs and the electrons with gamma >= 1.05 (lab_beams.txt). Used by tests/mpi.sh.
+#   build/vlpl examples/lwfa_boost.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 128            # 6.4 um in the lab
+  ny         = 48
+  nz         = 48
+  dx         = 0.05 um        # lab; boosted 0.187 um
+  dy         = 0.5 um
+  dz         = 0.5 um
+  boundary_x = open
+  t_end      = 150 fs         # lab
+}
+
+boost {
+  gamma = 2
+}
+
+lab_diagnostics {
+  t_first   = 80 fs
+  t_every   = 30 fs
+  count     = 3
+  species   = electrons
+  gamma_min = 1.05
+}
+
+numerics {
+  solver = rip_cc
+  shape  = 2
+}
+
+laser {
+  a0           = 2
+  polarization = y
+  duration     = 4 fs
+  delay        = 8 fs
+  waist        = 4 um
+  focus        = 0 um
+  # injection = antenna      # the lab-fixed antenna at x = 0 instead of the boosted entrance plane (decision 89)
+}
+
+window {
+  start = 18 fs               # < box length / c: the laser has entered before the window moves and sits near the front
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.01
+  xmin    = 7 um
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.01
+  xmin    = 7 um
+}
+
+output {
+  dir   = out_lwfa_boost
+  every = 20
+}

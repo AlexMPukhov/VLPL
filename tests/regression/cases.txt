@@ -1,0 +1,8 @@
+# name | deck | overrides (separated by ';', each applied as a command-line block.key=value)
+stream    | examples/streaming_plasma.deck | grid.nx=32; grid.ny=16; grid.nz=16; grid.t_end=0.6ps; output.every=10
+stream_s2 | examples/streaming_plasma.deck | grid.nx=32; grid.ny=16; grid.nz=16; grid.t_end=0.3ps; numerics.shape=2; numerics.pusher=boris; output.every=10
+reflect   | examples/laser_reflection.deck | grid.nx=192; grid.ny=192; grid.t_end=25fs; laser.y_center=6.5um; species electrons.slab_x0=2.5um; species electrons.slab_y0=6.5um; species electrons.ymin=3um; species electrons.ppc_x=2; species electrons.ppc_y=2; species protons.slab_x0=2.5um; species protons.slab_y0=6.5um; species protons.ymin=3um; species protons.ppc_x=2; species protons.ppc_y=2; output.every=25; output.slice_every=0
+lwfa      | examples/lwfa_window.deck | grid.nx=64; grid.ny=16; grid.nz=16; grid.t_end=80fs; laser.waist=1um; laser.waist_z=1um; laser.duration=2.5fs; window.start=10fs; species electrons.xmin=4um; species protons.xmin=4um; species electrons.uth_x=0.05; species electrons.uth_y=0.05; species electrons.uth_z=0.05; output.every=20; output.slice_every=0
+beam      | examples/beam_vacuum.deck | grid.t_end=5fs; output.every=10
+rz        | examples/rz_plasma.deck | grid.t_end=60fs; output.every=10
+rz_lwfa   | examples/rz_lwfa.deck | grid.nz=128; grid.t_end=80fs; laser.duration=5fs; window.start=20fs; output.every=20

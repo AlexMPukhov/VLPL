@@ -1,0 +1,58 @@
+# A plane-wave pulse at 75.5 deg to x enters through the faces of the side TFSF tube (docs/specs/side_injection.md)
+# and crosses a thin underdense plasma layer. Inside the tube the total field, outside it only the scattered field
+# (here: what the layer reflects and radiates), which the CPML layers absorb. x is periodic: the components of the
+# pulse share k_x = cos(angle) k0 (nx dx = 8 lambda0, cos(angle) = 1/4).
+#   build/vlpl examples/side_wave.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 128             # 6.4 um, 16 cells per wavelength along x (c dt = dx)
+  ny         = 64              # 5.12 um
+  nz         = 64
+  dx         = 0.05 um
+  dy         = 0.08 um
+  dz         = 0.08 um
+  boundary_x = periodic
+  boundary_y = pml
+  boundary_z = pml
+  t_end      = 40 fs
+}
+
+pml {
+  cells = 10
+}
+
+side {
+  faces        = yz            # the tube: total-field nodes 12..51 along y and z (2 cells inside the CPML layers)
+  a0           = 0.3
+  angle        = 75.52248781 deg   # from x towards y; k_x snapped to the periodic lattice
+  polarization = z
+  duration     = 12 fs
+  delay        = 20 fs         # the peak passes y_center then (it starts outside the tube)
+  y_center     = 2.3 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.5                # n_c
+  ymin    = 2.0 um
+  ymax    = 2.6 um
+  zmin    = 1.2 um             # the plasma ends 2 cells inside the faces (1.12 .. 3.92 um)
+  zmax    = 3.8 um
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  mobile  = false
+  density = 0.5
+  ymin    = 2.0 um
+  ymax    = 2.6 um
+  zmin    = 1.2 um
+  zmax    = 3.8 um
+}
+
+output {
+  dir   = out_side
+  every = 20
+}

@@ -1,0 +1,61 @@
+# Field-ionization benchmark against Smilei 5.1 (bench/ionization_smilei/README.md): a plane-wave Gaussian pulse (a0 = 0.03,
+# 10 fs intensity FWHM, lambda0 = 0.8 um, E_y) through a hydrogen slab (0.1 n_c, 16 um: the ionization energy is ~3 %
+# of the pulse energy) doped with a carbon tracer (1e-5 n_c: its electrons are negligible). 1D-like: cartesian2d with 4
+# periodic y cells; dx = lambda0 / 64.
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 3520            # 44 um
+  ny         = 4
+  dx         = 0.0125 um
+  dy         = 0.025 um
+  boundary_x = open
+  t_end      = 140 fs
+}
+
+numerics {
+  shape = 2
+}
+
+laser {
+  a0           = 0.03
+  polarization = y
+  duration     = 10 fs
+  delay        = 25 fs
+  waist        = 10000 um      # a plane wave
+}
+
+species hydrogen {
+  element              = H
+  ionization           = adk
+  ionization_electrons = electrons
+  density              = 0.1
+  xmin                 = 12 um
+  xmax                 = 28 um
+  ppc_x                = 4
+  ppc_y                = 1
+  mobile               = false
+}
+
+species carbon {
+  element              = C
+  ionization           = adk
+  ionization_electrons = electrons
+  density              = 1e-5
+  xmin                 = 12 um
+  xmax                 = 28 um
+  ppc_x                = 16
+  ppc_y                = 4
+  mobile               = false
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0
+}
+
+output {
+  dir   = out_rip
+  every = 16
+}

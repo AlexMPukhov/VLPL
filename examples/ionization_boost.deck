@@ -1,0 +1,57 @@
+# Field ionization in the Lorentz-boosted frame (docs/specs/field_ionization.md, boosted_frame.md, decision 90): an 8 fs
+# plane wave (a0 = 0.0105, lambda0 / 32) through a nitrogen slab (lab x in [60, 66] um, 1e-4 n_c atoms) in 2D, run in the
+# frame boosted by gamma = 2 along x. The ions are at rest in the lab and stream at -0.866 c through the box; the ADK rate is
+# taken from |E| in the ion's rest frame (the lab field) over its proper time dt / gamma, so the charge states after the pulse
+# are those of the lab run (boost.enabled = false runs the same deck in the lab; tests/test_boost.cpp B4: N1+ 0.5244
+# boosted vs 0.5238 lab, 0.1 sigma).
+# The slab sits where every ion is still in the boosted box at the end (an ion at lab x leaves at the lab time x / beta + 2 delay).
+#   build/vlpl examples/ionization_boost.deck                       (boosted, 748 steps)
+#   build/vlpl examples/ionization_boost.deck boost.enabled=false   (lab, 3088 steps)
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 2800            # 70 um (lab), lambda0 / 32; boosted: dx' = gamma (1 + beta) dx
+  ny         = 8               # periodic
+  dx         = 0.025 um
+  dy         = 0.1 um
+  boundary_x = open
+  t_end      = 257.5 fs        # lab time
+}
+
+numerics {
+  solver = irip
+}
+
+laser {
+  a0           = 0.0105
+  polarization = y
+  duration     = 8 fs
+  delay        = 16 fs
+  waist        = 1000 um       # a plane wave over the periodic y
+}
+
+species nitrogen {
+  element              = N
+  ionization           = adk
+  ionization_electrons = electrons
+  density              = 1e-4
+  xmin                 = 60 um
+  xmax                 = 66 um
+  ppc_x                = 32
+  ppc_y                = 4
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0
+}
+
+boost {
+  gamma = 2
+}
+
+output {
+  dir   = out_ionization_boost
+  every = 50
+}

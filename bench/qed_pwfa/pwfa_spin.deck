@@ -1,0 +1,71 @@
+# Radiative depolarization of a 1 TeV witness in a PWFA blowout (docs/specs/qed.md, decision 93), a reduced version of the
+# setup of Mathiak, Reichwein, Pukhov et al., arXiv:2605.19814, Fig. 2: 500 GeV, 2.25 nC driver (sigma_x 5 um, sigma_r 1 um),
+# plasma 2.2e18 cm^-3 with a 400 um up-ramp, a 1 TeV witness (sigma 2.5 um, 1.3 nC) 66 um behind the driver, offset by
+# 10 um in y, initially polarized along x. Reduced: dx = 0.25 um, dy = dz = 0.5 um (paper 0.125 / 0.25 um), a 100 x 64 x
+# 64 um box, 1 plasma particle per cell. Runs (bench/qed_pwfa/README.md): both effects (this deck), T-BMT only
+# (qed.model=none), radiation only (qed.spin_precession=false).
+grid {
+  lambda0    = 1 um
+  nx         = 400             # 100 um
+  ny         = 128             # 64 um
+  nz         = 128
+  dx         = 0.25 um
+  dy         = 0.5 um
+  dz         = 0.5 um
+  boundary_x = open
+  t_end      = 20 ps
+}
+
+numerics {
+  shape = 1
+  seed  = 11
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+species plasma {
+  charge  = -1
+  mass    = 1
+  density = 1.9734e-3          # 2.2e18 cm^-3 (n_c = 1.1148e21 cm^-3 at 1 um)
+  xmin    = 100 um             # ahead of the box: enters with the window
+  density_function = x < 500 um ? (x - 100 um) / (400 um) : 1
+}
+
+species driver {
+  charge  = -1
+  mass    = 1
+  density = 0.16                # n_c, peak: 2.25 nC
+  ux      = 978474             # 500 GeV
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  density_function = gauss(x - 80 um, 5 um) * gauss(sqrt((y - 32 um)^2 + (z - 32 um)^2), 1 um) * (abs(x - 80 um) < 15 um) * (sqrt((y - 32 um)^2 + (z - 32 um)^2) < 3 um)
+  self_field = true
+}
+
+species witness {
+  charge  = -1
+  mass    = 1
+  density = 0.0296             # n_c, peak: 1.3 nC
+  ux      = 1956950            # 1 TeV
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  density_function = gauss(x - 14 um, 2.5 um) * gauss(sqrt((y - 42 um)^2 + (z - 32 um)^2), 2.5 um) * (abs(x - 14 um) < 7.5 um) * (sqrt((y - 42 um)^2 + (z - 32 um)^2) < 7.5 um)
+  self_field = true
+  spin = 1 0 0
+}
+
+qed {
+  species       = witness
+  model         = monte_carlo
+  spectrum_bins = 120
+}
+
+output {
+  dir   = out_pwfa_spin
+  every = 400                  # 0.33 ps
+}

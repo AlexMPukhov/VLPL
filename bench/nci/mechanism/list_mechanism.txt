@@ -1,0 +1,34 @@
+# name solver shape passes gamma n0 Nlab h_um uth nx
+i_g10_h025_s2_f0 irip 2 0 10 0.004 32 0.25 1e-2 128
+i_g10_h025_s2_f1 irip 2 1 10 0.004 32 0.25 1e-2 128
+i_g10_h025_s2_f2 irip 2 2 10 0.004 32 0.25 1e-2 128
+i_g10_h025_s1_f0 irip 1 0 10 0.004 32 0.25 1e-2 128
+i_g10_h025_s1_f1 irip 1 1 10 0.004 32 0.25 1e-2 128
+i_g10_h025_s1_f2 irip 1 2 10 0.004 32 0.25 1e-2 128
+i_g10_h1_s2_f0 irip 2 0 10 0.004 32 1 1e-2 128
+i_g10_h1_s2_f1 irip 2 1 10 0.004 32 1 1e-2 128
+i_g10_h1_s1_f0 irip 1 0 10 0.004 32 1 1e-2 128
+r_g10_h1_s2_f0 rip_cc 2 0 10 0.004 32 1 1e-2 128
+r_g10_h1_s2_f1 rip_cc 2 1 10 0.004 32 1 1e-2 128
+r_g10_h1_s1_f0 rip_cc 1 0 10 0.004 32 1 1e-2 128
+i_g2_h025_s2_f0 irip 2 0 2 0.004 32 0.25 1e-2 128
+i_g5_h025_s2_f0 irip 2 0 5 0.004 32 0.25 1e-2 128
+i_g20_h025_s2_f0 irip 2 0 20 0.004 32 0.25 1e-2 128
+i_g2_h1_s2_f0 irip 2 0 2 0.004 32 1 1e-2 128
+i_g5_h1_s2_f0 irip 2 0 5 0.004 32 1 1e-2 128
+i_g20_h1_s2_f0 irip 2 0 20 0.004 32 1 1e-2 128
+i_g10_h025_s2_f0_n002 irip 2 0 10 0.002 32 0.25 1e-2 128
+i_g10_h025_s2_f0_n008 irip 2 0 10 0.008 32 0.25 1e-2 128
+i_g10_h025_s2_f0_N64 irip 2 0 10 0.004 64 0.25 1e-2 128
+i_g10_h025_s2_f0_cold irip 2 0 10 0.004 32 0.25 1e-3 128
+i_g10_h025_s2_f1_cold irip 2 1 10 0.004 32 0.25 1e-3 128
+i_g10_h025_s2_f2_cold irip 2 2 10 0.004 32 0.25 1e-3 128
+r_g5_h1_s2_f0 rip_cc 2 0 5 0.004 32 1 1e-2 128
+i_g10_h025_s2_f0_iso irip 2 0 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+i_g10_h025_s2_f1_iso irip 2 1 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+i_g10_h025_s2_f2_iso irip 2 2 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+i_g10_h1_s2_f1_iso irip 2 1 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+i_g10_h025_s2_f0_cold2 irip 2 0 10 0.004 32 0.25 1e-3 128
+i_g20_h025_s2_f0 irip 2 0 20 0.002 32 0.25 1e-2 128
+i_g20_h1_s2_f0 irip 2 0 20 0.002 32 1 1e-2 128
+i_g20_h025_s2_f2 irip 2 2 20 0.002 32 0.25 1e-2 128

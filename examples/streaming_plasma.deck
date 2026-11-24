@@ -1,0 +1,50 @@
+# Numerical Cerenkov test after Pukhov, JCP 418, 109622 (2020), Sec. 7.1: neutral e-p plasma
+# streaming along -x with u = -10 through a periodic box, small electron temperature.
+# Run:   build/vlpl examples/streaming_plasma.deck
+# Watch W_field (column 3 of out_stream/diag.txt) and max|dGauss| (column 6, stays at round-off).
+# Here n = 0.01 n_c, so c/wp = 10/k0: hy = hz = 1.88 c/wp = 18.8/k0, hx = c dt = 0.63 c/wp = 6.3/k0.
+
+grid {
+  lambda0    = 1 um
+  nx         = 64
+  ny         = 32
+  nz         = 32
+  dx         = 1.0027 um      # 6.3 / k0
+  dy         = 2.992 um       # 18.8 / k0
+  dz         = 2.992 um
+  boundary_x = periodic
+  t_end      = 1.5 ps         # 280 / wp, about 45 plasma periods
+}
+
+numerics {
+  shape  = 1
+  pusher = higuera_cary
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.01
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  ux      = -10
+  uth_x   = 1e-4
+  uth_y   = 1e-4
+  uth_z   = 1e-4
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.01
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  ux      = -10
+}
+
+output {
+  dir   = out_stream
+  every = 10
+}

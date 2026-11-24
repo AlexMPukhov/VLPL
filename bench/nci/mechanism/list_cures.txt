@@ -1,0 +1,39 @@
+c_i_g10_h025_s2_f0 irip 2 0 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g10_h025_s2_f2 irip 2 2 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g10_h025_s2_f1c irip 2 1 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g10_h025_s2_f2c irip 2 2 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g10_h025_s2_f4c irip 2 4 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g10_h025_s2_f2x irip 2 2 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_axes=x
+c_i_g10_h025_s2_f4x irip 2 4 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_axes=x
+c_i_g10_h025_s2_f2cx irip 2 2 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g10_h025_s2_f4cx irip 2 4 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g10_h025_s2_f8cx irip 2 8 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g10_h1_s2_f2 irip 2 2 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_r_g10_h1_s2_f2 rip_cc 2 2 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g20_h025_s2_f2 irip 2 2 20 0.002 32 0.25 1e-2 128 'species electrons.uth_x=2e-2' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g5_h025_s2_f2 irip 2 2 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g10_h025_s1_f2 irip 1 2 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g10_h1_s2_f4c irip 2 4 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_r_g10_h1_s2_f4c rip_cc 2 4 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g20_h025_s2_f4c irip 2 4 20 0.002 32 0.25 1e-2 128 'species electrons.uth_x=2e-2' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g5_h025_s2_f4c irip 2 4 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g10_h025_s1_f4c irip 1 4 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g10_h1_s2_f4cx irip 2 4 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_r_g10_h1_s2_f4cx rip_cc 2 4 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g20_h025_s2_f4cx irip 2 4 20 0.002 32 0.25 1e-2 128 'species electrons.uth_x=2e-2' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g5_h025_s2_f4cx irip 2 4 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g10_h025_s1_f4cx irip 1 4 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g5_h025_s2_f0 irip 2 0 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g5_h025_s2_f4 irip 2 4 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' 
+c_i_g5_h025_s2_f4x irip 2 4 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_axes=x
+c_i_g5_h025_s2_f6x irip 2 6 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_axes=x
+c_i_g5_h025_s2_f8x irip 2 8 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_axes=x
+c_i_g5_h025_s2_f8c irip 2 8 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true
+c_i_g5_h025_s2_f8cx irip 2 8 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g5_h025_s2_f12cx irip 2 12 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g5_h025_s2_f16cx irip 2 16 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+d_i_g10_h025_s2_f4x irip 2 4 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_axes=x
+d_i_g10_h025_s2_f8cx irip 2 8 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+d_i_g10_h025_s2_f16cx irip 2 16 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x
+c_i_g3_h025_s2_f0 irip 2 0 3 0.004 32 0.25 1e-2 128 'species electrons.uth_x=3e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+c_i_g3_h025_s2_f2 irip 2 2 3 0.004 32 0.25 1e-2 128 'species electrons.uth_x=3e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'

@@ -1,0 +1,87 @@
+# A rigid 1 GeV electron bunch, offset by 30 um, through a round corrugated metal pipe inside two quadrupoles (a FODO
+# cell); the wake potential at the axis and at the offset, the slices of the bunch and the energy that leaves sideways
+# into the CPML layers before the bunch enters the pipe (docs/specs/structure3d.md). A small demonstration box, not a
+# converged run.
+#   build/vlpl examples/structure_pipe.deck
+grid {
+  lambda0    = 10 um           # the unit of length 1/k0 = 1.59 um
+  nx         = 96              # 0.96 mm window
+  ny         = 64              # 1.28 mm
+  nz         = 64
+  dx         = 10 um
+  dy         = 20 um
+  dz         = 20 um
+  boundary_x = open
+  boundary_y = pml
+  boundary_z = pml
+  t_end      = 10 ps           # 3 mm of structure
+}
+
+pml {
+  cells = 10
+}
+
+numerics {
+  shape = 2
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+# pipe: inner radius 0.30 mm at the teeth, 0.36 mm in the grooves (period 100 um, gap 50 um), wall out to 0.50 mm;
+# the structure starts at x = 1.2 mm (the bunch starts in vacuum ahead of it)
+metal {
+  function = "x > 1.2 mm && sqrt((y - 0.64 mm)^2 + (z - 0.64 mm)^2) > (x - 100 um * floor(x / (100 um)) < 50 um ? 0.36 mm : 0.30 mm) && sqrt((y - 0.64 mm)^2 + (z - 0.64 mm)^2) < 0.50 mm ? 1 : -1"
+}
+
+quadrupole QF {
+  x_start  = 1.0 mm
+  length   = 1.0 mm
+  gradient = 1000              # T/m, focusing in y
+}
+
+quadrupole QD {
+  x_start  = 2.0 mm
+  length   = 1.0 mm
+  gradient = -1000
+}
+
+species drive {
+  charge      = -1
+  mass        = 1
+  density     = 2e-4           # n_c at lambda0 = 10 um: 2.2e15 cm^-3 peak, ~ 30 pC
+  ux          = 1957           # 1 GeV
+  uth_x       = 2              # 0.1 % energy spread
+  ppc_x       = 2
+  ppc_y       = 2
+  ppc_z       = 2
+  density_function = gauss(x - 0.6 mm, 40 um) * gauss(sqrt((y - 0.67 mm)^2 + (z - 0.64 mm)^2), 20 um) * (abs(x - 0.6 mm) < 160 um) * (sqrt((y - 0.67 mm)^2 + (z - 0.64 mm)^2) < 80 um)
+  self_field  = true
+  rigid_until = 1 ns           # a rigid driver: the wake of a fixed bunch
+}
+
+wake axis {
+  every = 200
+}
+
+wake offset {
+  y     = 0.67 mm
+  every = 200
+}
+
+beam_slices drive {
+  species = drive
+  dx      = 20 um
+  every   = 200
+}
+
+side_flux {
+  every = 10
+}
+
+output {
+  dir   = out_structure_pipe
+  every = 10
+}

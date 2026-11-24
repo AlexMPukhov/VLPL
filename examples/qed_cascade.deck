@@ -1,0 +1,82 @@
+# Breit-Wheeler pairs (docs/specs/qed.md, decision 96): a 10 GeV electron beam (spin along z) collides head-on with an a0 = 80
+# pulse (y-polarized; chi_e = 2 gamma a0 hbar omega0 / m c^2 up to 9.5). The electrons emit photons (Monte Carlo, LCFA, spin- and
+# polarization-resolved); photons above 1 MeV go into `photons` and decay into pairs (positrons into `positrons`, electrons
+# into `pair_electrons`), which radiate in turn: a cascade of 2 - 3 generations.
+# out_qed_cascade/qed.txt: <S>, <chi>, emitted energy per lepton species, N_pairs, the pair spins; qed_pairs.txt: dN/dx of the
+# pairs (x = eps_+ / eps_gamma) and their energy spectrum; qed_spectrum_<species>.txt: the photons.
+# examples/qed_cascade_estimate.py: the first-generation pair yield of an electron on the axis (rates of the same LCFA).
+#   build/vlpl examples/qed_cascade.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 300             # 12 um, lambda0 / 20
+  ny         = 64              # 10.24 um
+  nz         = 64
+  dx         = 0.04 um
+  dy         = 0.16 um
+  dz         = 0.16 um
+  boundary_x = open
+  t_end      = 40 fs
+}
+
+numerics {
+  shape = 2
+  seed  = 7
+}
+
+laser {
+  a0           = 80
+  polarization = y
+  duration     = 8 fs            # intensity FWHM
+  waist        = 3 um
+  waist_z      = 3 um
+  focus        = 3 um            # the pulse peak (delay 16 fs) meets the beam centre near x = 2.7 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 1e-4               # n_c: the beam's own fields stay negligible
+  ux      = -19569.5           # 10 GeV, towards the laser
+  xmin    = 9.5 um
+  xmax    = 11 um
+  ymin    = 4.62 um            # 1 um wide around the axis (y = z = 5.12 um)
+  ymax    = 5.62 um
+  zmin    = 4.62 um
+  zmax    = 5.62 um
+  ppc_x   = 4
+  ppc_y   = 2
+  ppc_z   = 2
+  spin    = 0 0 1
+}
+
+species photons {
+  kind = photon
+}
+
+species positrons {
+  charge  = 1
+  mass    = 1
+  density = 0                  # filled by the pairs
+  spin    = 0 0 0
+}
+
+species pair_electrons {
+  charge  = -1
+  mass    = 1
+  density = 0
+  spin    = 0 0 0
+}
+
+qed {
+  species           = electrons positrons pair_electrons
+  photons           = photons
+  photon_min_energy = 1        # MeV (photons below 2 m c^2 = 1.022 MeV cannot decay)
+  pair_electrons    = pair_electrons
+  pair_positrons    = positrons
+  spectrum_bins     = 100
+}
+
+output {
+  dir   = out_qed_cascade
+  every = 20
+}

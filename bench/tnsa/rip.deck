@@ -1,0 +1,98 @@
+# TNSA benchmark against Smilei (bench/tnsa/README.md; Gate O of docs/ROADMAP.md: proton cutoff within 10 %).
+# 2D (grid.geometry = cartesian2d, docs/specs/cart2d.md): the x-y problem of Smilei's 2Dcartesian namelist (smilei/tnsa.py). Until 2026-11-02 run as a
+# Cart3D slab of 3 periodic z cells (grid.geometry=cartesian grid.nz=3 on the command line: the same at t = 0, 13.5 times the cost).
+# Normal incidence: a p-polarised (E_y) Gaussian pulse enters through the TFSF plane (exact plane waves,
+# decision 65) and hits a C6+ foil with an exponential pre-plasma in front and a hydrogen contaminant layer at the rear.
+# The reflected light and the electrons leaving through x go into the absorbing layers.
+# As written: the code check (lambda0/32 x lambda0/16, 2 x 2 particles per cell, 200 fs). The benchmark resolution is set
+# on the command line, e.g. grid.nx=2400 grid.dx=0.0125um grid.ny=1600 grid.dy=0.025um (see README).
+# Coordinates (um): left absorber 0-2, TFSF plane x = 2.5, pre-plasma 7.1-7.5, foil 7.5-8.5, contaminant 8.5-8.6,
+# right absorber 28-30; y periodic (40 um, the foil fills all y), laser axis y = 20. Smilei's box is x' = x - 2 in [0, 26].
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 1200            # 30 um, dx = lambda0 / 32
+  ny         = 800             # 40 um, periodic
+  dx         = 0.025 um
+  dy         = 0.05 um
+  dz         = 0.4 um          # slab thickness of the totals (one z cell of the former Cart3D slab)
+  boundary_x = absorbing
+  x_absorber_width = 2 um
+  t_end      = 200.2 fs        # 2400 steps: the last proton dump at 200.1 fs
+}
+
+numerics {
+  shape  = 2                   # >= 2 with a resolved ramp under p polarisation (decision 64)
+  pusher = higuera_cary
+}
+
+laser {
+  a0            = 10
+  polarization  = y            # in the x-y plane (p)
+  duration      = 30 fs        # FWHM of the intensity
+  delay         = 60 fs        # the peak crosses the plane then and reaches the foil surface x = 7.5 um at 76.68 fs
+  waist         = 3 um
+  waist_z       = 0 um         # uniform in z
+  focus         = 5 um         # along the beam beyond the plane: on the foil surface
+  tfsf_x        = 2.5 um
+  tfsf_incident = modes
+  angle         = 0 deg
+  y_center      = 20 um
+}
+
+species electrons {            # foil electrons (C6+ fully ionised, n_e = 40 n_c)
+  charge  = -1
+  mass    = 1
+  density = 40
+  slab_x0 = 7.5 um
+  slab_thickness = 1 um
+  slab_ramp = 0.08 um          # pre-plasma L = lambda0 / 10
+  slab_ramp_extent = 0.4 um    # cut at 5 L
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species carbon {               # C6+, n_i = n_e / 6 on the same lattice: neutral at t = 0
+  charge  = 6
+  mass    = 22032              # 12 x 1836
+  density = 6.666666666666667
+  slab_x0 = 7.5 um
+  slab_thickness = 1 um
+  slab_ramp = 0.08 um
+  slab_ramp_extent = 0.4 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species h_electrons {          # electrons of the contaminant layer
+  charge  = -1
+  mass    = 1
+  density = 10
+  slab_x0 = 8.5 um
+  slab_thickness = 0.1 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species protons {              # hydrogen contaminant on the rear surface
+  charge  = 1
+  mass    = 1836
+  density = 10
+  slab_x0 = 8.5 um
+  slab_thickness = 0.1 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+diagnostic protons {           # every proton, raw (tools: bench/tnsa/spectrum.py)
+  species   = protons
+  every     = 600              # 50.0 fs at dt = 0.0834 fs (lambda0/32); 1200 at lambda0/64
+  bins      = 400
+  e_max_mev = 40
+  particles = true
+}
+
+output {
+  dir   = out_code
+  every = 600
+}

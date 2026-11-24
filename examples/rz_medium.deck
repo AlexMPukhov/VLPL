@@ -1,0 +1,44 @@
+# O7 in RZ (docs/specs/linear_medium.md, decision 84): a laser (m = 1) through the open left z edge onto a Lorentz glass layer
+# (eps(omega0) = 2.25) followed by a collisional 9 n_c plasma, as particle-free media, iRIP, 2 modes.
+#   build/vlpl examples/rz_medium.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 320
+  nr         = 48
+  dz         = 0.05 um
+  dr         = 0.1 um          # the wall at r = 4.8 um
+  boundary_z = open
+  t_end      = 60 fs
+}
+
+numerics {
+  solver = irip
+}
+
+laser {
+  a0           = 1
+  polarization = x
+  duration     = 8 fs
+  waist        = 2 um
+  focus        = 8 um
+}
+
+medium glass {
+  model        = lorentz
+  permittivity = 2.25
+  resonance    = 3
+  profile      = z > 6 um && z < 9 um
+}
+
+medium plasma {
+  density = 9
+  collision_frequency = 1
+  profile = z >= 9 um && r < 4 um
+}
+
+output {
+  dir   = out_rz_medium
+  every = 40
+}

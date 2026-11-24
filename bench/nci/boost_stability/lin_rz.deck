@@ -1,0 +1,44 @@
+# Linear NCI test on a boosted-LWFA grid in RZ (bench/nci/boost_stability/README.md): neutral e-p plasma streaming along -z,
+# periodic z, wall at r = R; dz, dr, density, uz, t_end set on the command line by the scan script.
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 1 um
+  nz         = 64
+  nr         = 32
+  dz         = 0.6234 um
+  dr         = 0.25 um
+  boundary_z = periodic
+  boundary_r = wall
+  t_end      = 2.5 ps
+}
+numerics {
+  solver = irip
+  shape  = 1
+  pusher = higuera_cary
+}
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.04
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uz        = -9.95
+  uth_z     = 1e-2
+  uth_x     = 1e-2
+  uth_y     = 1e-2
+}
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.04
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uz        = -9.95
+}
+output {
+  dir   = out_lin
+  every = 10
+}

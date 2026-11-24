@@ -1,0 +1,50 @@
+# Ultra-low emittance beam in vacuum: Fig. 4 of A. Pukhov, J. Comput. Phys. 418, 109622 (2020), Sec. 7.3.
+# 10 GeV electrons, eps_n,y = eps_n,z = 1 nm, round Gaussian sigma_x = sigma_y = sigma_z = 1.41 um, 6 nC (or
+# 0.6 nC: density 0.0761), h_x = 0.1 um, h_y = h_z = 0.15 um, 1 mm. The beam starts with its steady self-field.
+# run_vacuum.sh makes the variants by overrides (solver, periodic x or the moving window, charge, dx); this file alone is
+# RIP-CC with an open x box that the beam leaves (use the window: "window.start=0 fs" window.velocity=1).
+#   build/vlpl bench/emittance/vacuum.deck
+grid {
+  lambda0    = 1 um
+  nx         = 256             # 25.6 um
+  ny         = 128             # 19.2 um (+-6.8 sigma)
+  nz         = 128
+  dx         = 0.1 um
+  dy         = 0.15 um
+  dz         = 0.15 um
+  boundary_x = open
+  t_end      = 3336 fs         # 1 mm
+}
+
+numerics {
+  shape  = 2
+  pusher = boris
+}
+
+
+species beam {
+  charge  = -1
+  mass    = 1
+  # peak density for 6 nC: Q / (e (2 pi)^1.5 sigma^3) = 8.48e20 cm^-3 = 0.761 n_c (1 um)
+  density = 0.761
+  ux      = 19570              # 10 GeV: gamma = 1 + 10 GeV / 0.511 MeV
+  uth_y   = 7.092e-4           # eps_n = sigma_y sigma_uy = 1 nm
+  uth_z   = 7.092e-4
+  ppc_x   = 2
+  ppc_y   = 2
+  ppc_z   = 2
+  # Gaussian, sigma = 1.41 um, cut at 4 sigma (5.64 um)
+  density_function = gauss(x - 12.8 um, 1.41 um) * gauss(sqrt((y - 9.6 um)^2 + (z - 9.6 um)^2), 1.41 um) * (abs(x - 12.8 um) < 5.64 um) * (sqrt((y - 9.6 um)^2 + (z - 9.6 um)^2) < 5.64 um)
+  self_field = true
+}
+
+diagnostic beam {
+  species   = beam
+  every     = 200
+  bins      = 0
+}
+
+output {
+  dir   = out_vacuum
+  every = 200
+}

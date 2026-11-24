@@ -1,0 +1,71 @@
+# 2D Cartesian geometry (docs/specs/cart2d.md): a p-polarised pulse at 30 deg through a TFSF plane (exact plane waves) onto
+# a 20 n_c foil with pre-plasma and mobile protons, absorbing x, periodic y; shape 2 and one pass of the current filter.
+# Fields and particles do not depend on z; totals (diag.txt energies, diagnostic charges) are per slab of thickness dz.
+#   build/vlpl examples/foil_2d.deck
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 480             # 12 um, lambda0 / 32
+  ny         = 160             # 8 um, periodic
+  dx         = 0.025 um
+  dy         = 0.05 um
+  dz         = 1 um            # slab thickness of the totals (the default)
+  boundary_x = absorbing
+  x_absorber_width = 1 um
+  t_end      = 40 fs
+}
+
+numerics {
+  shape         = 2
+  filter_passes = 1
+  filter        = projection   # the longitudinal current only: the harmonics radiate unfiltered (decisions 69, 91)
+}
+
+laser {
+  a0            = 5
+  polarization  = y            # in the x-y plane (p)
+  duration      = 8 fs
+  delay         = 16 fs        # the peak crosses the plane then
+  waist         = 2 um
+  focus         = 3.46 um      # along the beam: on the foil surface
+  tfsf_x        = 2 um
+  tfsf_incident = modes
+  angle         = 30 deg
+  y_center      = 4 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 20
+  slab_x0 = 5 um
+  slab_thickness = 1 um
+  slab_ramp = 0.08 um
+  slab_ramp_extent = 0.4 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 20
+  slab_x0 = 5 um
+  slab_thickness = 1 um
+  slab_ramp = 0.08 um
+  slab_ramp_extent = 0.4 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+diagnostic protons {
+  species   = protons
+  every     = 160
+  bins      = 100
+  e_max_mev = 5
+}
+
+output {
+  dir   = out_foil_2d
+  every = 40
+}

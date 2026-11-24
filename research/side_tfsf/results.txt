@@ -1,0 +1,118 @@
+# (1) exact discrete RIP-CC plane wave(s), dx = lambda/32: leakage and total - incident, rel. to the amplitude
+# angle to x, lambda/dy, pol, one wave or two at +-angle (cone)
+  5   8 p one   leak  6.47e-14  err  1.26e-13
+  5   8 s one   leak  2.06e-14  err  5.18e-14
+  5  16 p one   leak  3.16e-14  err  5.87e-14
+  5  16 s one   leak  6.97e-14  err  1.34e-13
+  5  24 p one   leak  2.23e-14  err  4.48e-14
+  5  24 s one   leak  3.31e-14  err  4.63e-14
+ 10   8 p one   leak  2.51e-13  err  3.93e-13
+ 10   8 s one   leak  5.52e-14  err  8.46e-14
+ 10  16 p one   leak  1.28e-13  err  1.93e-13
+ 10  16 s one   leak  2.15e-14  err  2.49e-14
+ 10  24 p one   leak  1.41e-13  err  2.06e-13
+ 10  24 s one   leak  7.52e-14  err  1.03e-13
+ 20   8 p one   leak  9.04e-14  err  9.58e-14
+ 20   8 s one   leak  2.76e-14  err  3.16e-14
+ 20  16 p one   leak  3.64e-14  err  4.16e-14
+ 20  16 s one   leak  2.56e-14  err  3.41e-14
+ 20  24 p one   leak  5.44e-14  err  5.77e-14
+ 20  24 s one   leak  5.39e-15  err  1.09e-14
+ 45   8 p one   leak  6.15e-14  err  6.56e-14
+ 45   8 s one   leak  4.09e-14  err  4.04e-14
+ 45  16 p one   leak  3.81e-14  err  3.85e-14
+ 45  16 s one   leak  5.55e-14  err  5.57e-14
+ 45  24 p one   leak  1.38e-13  err  1.37e-13
+ 45  24 s one   leak  4.29e-14  err  4.54e-14
+ 60   8 p one   leak  1.12e-13  err  1.09e-13
+ 60   8 s one   leak  2.62e-14  err  2.92e-14
+ 60  16 p one   leak  3.65e-14  err  3.94e-14
+ 60  16 s one   leak  9.31e-15  err  1.54e-14
+ 60  24 p one   leak  6.93e-14  err  6.93e-14
+ 60  24 s one   leak  2.87e-14  err  3.10e-14
+ 75   8 p one   leak  4.66e-14  err  5.11e-14
+ 75   8 s one   leak  3.34e-14  err  3.42e-14
+ 75  16 p one   leak  8.79e-14  err  7.71e-14
+ 75  16 s one   leak  1.59e-14  err  2.02e-14
+ 75  24 p one   leak  2.24e-14  err  2.50e-14
+ 75  24 s one   leak  3.57e-14  err  3.00e-14
+ 90   8 p one   leak  8.28e-15  err  1.32e-14
+ 90   8 s one   leak  4.26e-14  err  3.90e-14
+ 90  16 p one   leak  1.58e-14  err  1.82e-14
+ 90  16 s one   leak  1.85e-14  err  1.92e-14
+ 90  24 p one   leak  1.30e-14  err  1.61e-14
+ 90  24 s one   leak  3.31e-14  err  2.65e-14
+  5   8 p cone  leak  4.55e-14  err  9.40e-14
+  5   8 s cone  leak  2.00e-14  err  3.44e-14
+  5  16 p cone  leak  2.02e-14  err  3.11e-14
+  5  16 s cone  leak  4.49e-14  err  9.09e-14
+  5  24 p cone  leak  8.91e-14  err  1.83e-13
+  5  24 s cone  leak  1.39e-14  err  2.80e-14
+ 10   8 p cone  leak  1.16e-13  err  1.90e-13
+ 10   8 s cone  leak  2.40e-14  err  4.86e-14
+ 10  16 p cone  leak  5.93e-14  err  1.03e-13
+ 10  16 s cone  leak  5.56e-14  err  7.60e-14
+ 10  24 p cone  leak  5.14e-14  err  1.34e-13
+ 10  24 s cone  leak  4.03e-14  err  5.28e-14
+ 20   8 p cone  leak  1.12e-13  err  1.24e-13
+ 20   8 s cone  leak  2.31e-14  err  2.74e-14
+ 20  16 p cone  leak  1.85e-14  err  2.80e-14
+ 20  16 s cone  leak  1.48e-14  err  1.94e-14
+ 20  24 p cone  leak  2.80e-14  err  3.12e-14
+ 20  24 s cone  leak  3.48e-14  err  3.73e-14
+ 45   8 p cone  leak  1.20e-13  err  1.21e-13
+ 45   8 s cone  leak  2.19e-14  err  2.23e-14
+ 45  16 p cone  leak  2.00e-14  err  2.23e-14
+ 45  16 s cone  leak  2.84e-14  err  3.06e-14
+ 45  24 p cone  leak  6.82e-14  err  6.99e-14
+ 45  24 s cone  leak  2.36e-14  err  2.82e-14
+ 60   8 p cone  leak  5.57e-14  err  5.75e-14
+ 60   8 s cone  leak  2.75e-14  err  3.05e-14
+ 60  16 p cone  leak  7.51e-14  err  7.75e-14
+ 60  16 s cone  leak  1.80e-14  err  2.10e-14
+ 60  24 p cone  leak  9.88e-14  err  9.98e-14
+ 60  24 s cone  leak  2.21e-14  err  2.57e-14
+ 75   8 p cone  leak  6.10e-14  err  6.21e-14
+ 75   8 s cone  leak  1.68e-14  err  2.03e-14
+ 75  16 p cone  leak  7.24e-14  err  6.00e-14
+ 75  16 s cone  leak  2.11e-14  err  2.35e-14
+ 75  24 p cone  leak  3.17e-14  err  3.18e-14
+ 75  24 s cone  leak  1.94e-14  err  2.27e-14
+
+# (2) continuum plane wave entering through the lower plane: leakage at the entry side, at the exit side,
+# total - incident within lambda/2 of the entry, and in the whole tube (4 lambda wide)
+  5 lambda/dx= 32 lambda/dy=  8  entry-side  8.35e-04  exit-side  1.21e-03  near-entry err  7.12e-04  tube err  1.08e-03
+  5 lambda/dx= 32 lambda/dy= 16  entry-side  8.22e-04  exit-side  1.15e-03  near-entry err  7.35e-04  tube err  1.07e-03
+  5 lambda/dx= 32 lambda/dy= 24  entry-side  8.21e-04  exit-side  1.14e-03  near-entry err  7.50e-04  tube err  1.09e-03
+ 10 lambda/dx= 32 lambda/dy=  8  entry-side  1.36e-03  exit-side  4.05e-03  near-entry err  1.89e-03  tube err  4.49e-03
+ 10 lambda/dx= 32 lambda/dy= 16  entry-side  1.23e-03  exit-side  3.25e-03  near-entry err  1.54e-03  tube err  3.41e-03
+ 10 lambda/dx= 32 lambda/dy= 24  entry-side  1.21e-03  exit-side  3.11e-03  near-entry err  1.48e-03  tube err  3.21e-03
+ 20 lambda/dx= 32 lambda/dy=  8  entry-side  2.24e-03  exit-side  2.85e-02  near-entry err  6.10e-03  tube err  2.78e-02
+ 20 lambda/dx= 32 lambda/dy= 16  entry-side  1.83e-03  exit-side  1.32e-02  near-entry err  3.29e-03  tube err  1.32e-02
+ 20 lambda/dx= 32 lambda/dy= 24  entry-side  1.84e-03  exit-side  1.04e-02  near-entry err  2.79e-03  tube err  1.06e-02
+ 45 lambda/dx= 32 lambda/dy=  8  entry-side  6.76e-03  exit-side  2.47e-01  near-entry err  3.25e-02  tube err  2.38e-01
+ 45 lambda/dx= 32 lambda/dy= 16  entry-side  3.86e-03  exit-side  5.99e-02  near-entry err  9.23e-03  tube err  5.80e-02
+ 45 lambda/dx= 32 lambda/dy= 24  entry-side  3.79e-03  exit-side  2.65e-02  near-entry err  5.32e-03  tube err  2.56e-02
+ 60 lambda/dx= 32 lambda/dy=  8  entry-side  1.11e-02  exit-side  4.39e-01  near-entry err  5.78e-02  tube err  4.23e-01
+ 60 lambda/dx= 32 lambda/dy= 16  entry-side  8.26e-03  exit-side  9.17e-02  near-entry err  1.37e-02  tube err  8.86e-02
+ 60 lambda/dx= 32 lambda/dy= 24  entry-side  8.59e-03  exit-side  3.05e-02  near-entry err  6.45e-03  tube err  2.96e-02
+ 75 lambda/dx= 32 lambda/dy=  8  entry-side  1.38e-02  exit-side  6.05e-01  near-entry err  7.82e-02  tube err  5.80e-01
+ 75 lambda/dx= 32 lambda/dy= 16  entry-side  9.81e-03  exit-side  1.47e-01  near-entry err  1.72e-02  tube err  1.14e-01
+ 75 lambda/dx= 32 lambda/dy= 24  entry-side  9.83e-03  exit-side  4.16e-02  near-entry err  7.34e-03  tube err  3.30e-02
+ 90 lambda/dx= 32 lambda/dy=  8  entry-side  1.66e-02  exit-side  7.66e-01  near-entry err  8.45e-02  tube err  6.60e-01
+ 90 lambda/dx= 32 lambda/dy= 16  entry-side  9.78e-03  exit-side  1.77e-01  near-entry err  1.86e-02  tube err  1.26e-01
+ 90 lambda/dx= 32 lambda/dy= 24  entry-side  1.00e-02  exit-side  4.70e-02  near-entry err  7.53e-03  tube err  3.42e-02
+  5 lambda/dx= 64 lambda/dy= 32  entry-side  2.05e-04  exit-side  2.93e-04  near-entry err  1.90e-04  tube err  2.84e-04
+ 10 lambda/dx= 64 lambda/dy= 32  entry-side  3.03e-04  exit-side  8.34e-04  near-entry err  3.72e-04  tube err  8.39e-04
+ 20 lambda/dx= 64 lambda/dy= 32  entry-side  4.62e-04  exit-side  3.31e-03  near-entry err  7.92e-04  tube err  3.27e-03
+ 45 lambda/dx= 64 lambda/dy= 32  entry-side  9.65e-04  exit-side  1.47e-02  near-entry err  2.27e-03  tube err  1.45e-02
+ 60 lambda/dx= 64 lambda/dy= 32  entry-side  2.11e-03  exit-side  2.25e-02  near-entry err  3.37e-03  tube err  2.21e-02
+ 75 lambda/dx= 64 lambda/dy= 32  entry-side  2.45e-03  exit-side  3.74e-02  near-entry err  4.24e-03  tube err  2.81e-02
+ 90 lambda/dx= 64 lambda/dy= 32  entry-side  2.53e-03  exit-side  4.52e-02  near-entry err  4.52e-03  tube err  3.08e-02
+  5 lambda/dx=128 lambda/dy= 32  entry-side  5.28e-05  exit-side  7.79e-05  near-entry err  4.88e-05  tube err  7.53e-05
+ 10 lambda/dx=128 lambda/dy= 32  entry-side  8.21e-05  exit-side  2.66e-04  near-entry err  1.12e-04  tube err  2.72e-04
+ 20 lambda/dx=128 lambda/dy= 32  entry-side  1.45e-04  exit-side  1.78e-03  near-entry err  3.71e-04  tube err  1.77e-03
+ 45 lambda/dx=128 lambda/dy= 32  entry-side  4.11e-04  exit-side  1.47e-02  near-entry err  2.00e-03  tube err  1.45e-02
+ 60 lambda/dx=128 lambda/dy= 32  entry-side  5.39e-04  exit-side  2.58e-02  near-entry err  3.40e-03  tube err  2.55e-02
+ 75 lambda/dx=128 lambda/dy= 32  entry-side  6.20e-04  exit-side  4.58e-02  near-entry err  4.55e-03  tube err  3.45e-02
+ 90 lambda/dx=128 lambda/dy= 32  entry-side  6.54e-04  exit-side  5.64e-02  near-entry err  4.88e-03  tube err  3.83e-02

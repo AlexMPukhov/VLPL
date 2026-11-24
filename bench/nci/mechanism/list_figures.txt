@@ -1,0 +1,5 @@
+fig_i_g10_h025_s2_f0 irip 2 0 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+fig_i_g10_h1_s2_f0 irip 2 0 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+fig_r_g10_h1_s2_f0 rip_cc 2 0 10 0.004 32 1 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+fig_i_g5_h025_s2_f0 irip 2 0 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'
+fig_i_g10_h025_s1_f0 irip 1 0 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3'

@@ -1,0 +1,80 @@
+# Oblique-incidence HHG benchmark against Smilei (bench/hhg_oblique/README.md; parameters chosen by Alexander 2026-11-01).
+# A p-polarised pulse at 45 deg to x enters through the TFSF plane as exact discrete plane waves (laser.tfsf_incident =
+# modes, decision 65) and hits an overdense foil whose normal is tilted by 22.5 deg: incidence 22.5 deg, the specular
+# reflection and its harmonics leave along -x and are recorded at the inner face of the left absorber (output.xflux_every,
+# tools/xflux.py). As written: the code check of Alexander (6 n_c, a0 = 2, lambda0/32 x lambda0/16). Production
+# (100 n_c, a0 = 10) needs lambda0/64 x lambda0/32 or finer (omega_p dt < 2).
+# Coordinates (um): left absorber 0-2, TFSF plane x = 2.5 (the beam axis crosses it at y = 17.5 at t = delay), foil hit
+# point P = (6.5, 21.5, 5), right absorber 9-11. y, z periodic (28.8 um as Smilei's box, 10 um). Same physics as Smilei's
+# box x' = x - 0.5 um.
+grid {
+  lambda0    = 0.8 um
+  nx         = 440             # 11 um, dx = lambda0 / 32
+  ny         = 576             # 28.8 um, periodic
+  nz         = 200             # 10 um, periodic
+  dx         = 0.025 um
+  dy         = 0.05 um
+  dz         = 0.05 um
+  boundary_x = absorbing
+  x_absorber_width = 2 um
+  t_end      = 110 fs
+}
+
+numerics {
+  shape  = 2
+  pusher = higuera_cary
+  filter = projection   # with filter_passes > 0: the longitudinal current only, harmonics unfiltered (decisions 69, 91)
+}
+
+laser {
+  a0            = 2
+  polarization  = y            # p: in the plane of incidence (x, y)
+  duration      = 13 fs        # FWHM of the intensity
+  delay         = 43 fs        # the peak crosses the plane at (2.5, 17.5) um then and reaches P at 61.9 fs
+  waist         = 2 um
+  waist_z       = 2 um
+  focus         = 5.657 um     # along the beam beyond the plane: at P
+  tfsf_x        = 2.5 um
+  tfsf_incident = modes
+  angle         = 45 deg
+  y_center      = 17.5 um
+  z_center      = 5 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 6                  # n_c (code check, Alexander 2026-11-01; production: 100 n_c, a0 = 10)
+  slab_x0 = 6.5 um
+  slab_y0 = 21.5 um
+  slab_angle = 22.5 deg        # normal into the foil; the specular direction of the 45 deg beam is -x
+  slab_thickness = 0.6 um
+  slab_ramp = 0.08 um          # pre-plasma L = lambda0 / 10
+  slab_ramp_extent = 0.4 um    # cut at 5 L
+  ymin    = 17.5 um            # foil 8 um long in y (4 waists)
+  ymax    = 25.5 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 6
+  slab_x0 = 6.5 um
+  slab_y0 = 21.5 um
+  slab_angle = 22.5 deg
+  slab_thickness = 0.6 um
+  slab_ramp = 0.08 um
+  slab_ramp_extent = 0.4 um
+  ymin    = 17.5 um
+  ymax    = 25.5 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+output {
+  dir   = out_32
+  every = 100
+  xflux_every = 1
+}

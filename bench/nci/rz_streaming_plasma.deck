@@ -1,0 +1,47 @@
+# The streaming-plasma NCI test of examples/streaming_plasma.deck in RZ (2 azimuthal modes): neutral e-p plasma,
+# n = 0.01 n_c, u = -10 along z through a periodic z box with a conducting wall; dz = 0.63 c/wp, dr = 1.88 c/wp.
+# bench/nci/run_boost.sh runs it with rip_cc and irip (the boosted-frame NCI check, decision 87).
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 1 um
+  nz         = 64
+  nr         = 32
+  dz         = 1.0027 um
+  dr         = 2.992 um
+  boundary_z = periodic
+  t_end      = 1.5 ps
+}
+
+numerics {
+  shape  = 1
+  pusher = higuera_cary
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.01
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uz        = -10
+  uth_z     = 1e-4
+  uth_x     = 1e-4
+  uth_y     = 1e-4
+}
+
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.01
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 8
+  uz        = -10
+}
+
+output {
+  dir   = out_rz_stream
+  every = 10
+}

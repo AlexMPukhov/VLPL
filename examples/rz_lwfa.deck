@@ -1,0 +1,56 @@
+# Laser wakefield in RZ with azimuthal modes (docs/specs/rz_modes.md), the RZ twin of
+# examples/lwfa_window.deck: a0 = 2.5, 10 fs, waist 4 um, polarised along y (the deck's z there), window
+# at c from 40 fs, plasma n = 0.01 n_c from z = 13 um on. The Gauss law per mode (max|dGauss|, column 6
+# of diag.txt) stays at round-off while plasma enters, is expelled to the wall region and leaves.
+#   build/vlpl examples/rz_lwfa.deck
+grid {
+  geometry   = rz
+  modes      = 2               # m = 0 (wake) and m = 1 (laser)
+  lambda0    = 0.8 um
+  nz         = 256             # 12.8 um, 16 cells per wavelength (c dt = dz)
+  nr         = 32              # 6.4 um: the half width of the Cartesian deck
+  dz         = 0.05 um
+  dr         = 0.2 um
+  boundary_z = open
+  t_end      = 200 fs
+}
+
+numerics {
+  solver = rip_cc              # dz^2 (lambda_max + wp^2) / 4 = 0.09
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 2.5
+  polarization = y
+  duration     = 10 fs
+  waist        = 4 um
+}
+
+window {
+  start    = 40 fs
+  velocity = 1
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.01
+  zmin      = 13 um
+  ppc_r     = 2
+  ppc_theta = 8
+}
+
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.01
+  zmin      = 13 um
+  ppc_r     = 2
+  ppc_theta = 8
+}
+
+output {
+  dir   = out_rz_lwfa
+  every = 50
+}

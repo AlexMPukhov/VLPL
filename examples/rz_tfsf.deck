@@ -1,0 +1,66 @@
+# RZ with a TFSF plane and absorbing z layers (docs/specs/tfsf.md "RZ", docs/specs/x_absorber.md "RZ"): a focused pulse
+# (polarised along x, waist 1 um) enters through the TFSF plane at z = 1.5 um and is reflected by a 10 n_c foil at z = 4 um;
+# left of the plane only the reflected light, which leaves through the left z layer. xflux.txt: Enet_left = the reflected
+# energy, E_inj = the laser energy (injected into the incident grid), W_in + W_kin + Enet_left + Enet_right + E_abs_r +
+# E_part_out = E_inj once the pulse has crossed the plane.
+#   build/vlpl examples/rz_tfsf.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 240
+  nr         = 64
+  dz         = 0.025 um
+  dr         = 0.05 um
+  boundary_z = absorbing
+  z_absorber_width = 1 um
+  boundary_r = absorbing
+  r_absorber_cells = 16
+  t_end      = 50 fs
+}
+
+numerics {
+  solver = rip_cc
+  shape  = 2
+}
+
+laser {
+  a0           = 1
+  polarization = x
+  duration     = 6 fs
+  delay        = 12 fs
+  waist        = 1 um
+  focus        = 4 um        # from z = 0, the entrance of the incident grid: on the foil
+  tfsf_x       = 1.5 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 10
+  zmin    = 4 um
+  zmax    = 4.5 um
+  rmax    = 2.4 um
+  ppc_z   = 2
+  ppc_r   = 2
+  ppc_theta = 6
+}
+
+species ions {
+  charge  = 1
+  mass    = 1836
+  density = 10
+  zmin    = 4 um
+  zmax    = 4.5 um
+  rmax    = 2.4 um
+  ppc_z   = 2
+  ppc_r   = 2
+  ppc_theta = 6
+  mobile  = false
+}
+
+output {
+  dir   = out_rz_tfsf
+  every = 40
+  xflux = true
+}

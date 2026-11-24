@@ -1,0 +1,63 @@
+# Nonlinear boosted-frame check (bench/nci/boost_stability/README.md): LWFA a0 = 2 / 4, n0 = 0.004 n_c after a 100 um up-ramp,
+# 2D, iRIP shape 2. The same deck runs in the lab (no boost block) and boosted (boost.gamma on the command line).
+grid {
+  geometry   = cartesian2d
+  lambda0    = 1 um
+  nx         = 1600            # 50 um, lambda / 32
+  ny         = 128             # 51.2 um, periodic
+  dx         = 0.03125 um
+  dy         = 0.4 um
+  boundary_x = open
+  t_end      = 2 ps            # lab
+}
+numerics {
+  solver = irip
+  shape  = 2
+  pusher = higuera_cary
+}
+laser {
+  a0           = 2
+  polarization = y
+  duration     = 15 fs
+  delay        = 30 fs
+  waist        = 8 um
+  focus        = 100 um
+  injection    = antenna
+}
+window {
+  start    = 150 fs
+  velocity = 1
+}
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0.004
+  xmin    = 60 um
+  density_function = x < 160 um ? (x - 60 um) / (100 um) : 1
+  ppc_x   = 2
+  ppc_y   = 2
+}
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 0.004
+  xmin    = 60 um
+  density_function = x < 160 um ? (x - 60 um) / (100 um) : 1
+  ppc_x   = 2
+  ppc_y   = 2
+}
+lab_diagnostics {
+  t_first   = 600.417 fs       # lab steps 5760, 9600, 13440, 17280 of the lab run (openpmd_every = 1920)
+  t_every   = 400.278 fs
+  count     = 4
+  fields    = true
+  species   = electrons
+  gamma_min = 1
+  particles = true
+}
+output {
+  dir           = out_nl
+  every         = 20
+  openpmd_every = 1920
+  openpmd_fields = E B rho_electrons
+}

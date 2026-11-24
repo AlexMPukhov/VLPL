@@ -1,0 +1,61 @@
+# Spin-resolved QED (docs/specs/qed.md, decision 93): a 1 GeV electron beam, spin along z, collides head-on with an
+# a0 = 100 pulse (y-polarized, B along z; chi up to ~1.2). The electrons emit photons (Monte Carlo, LCFA, spin- and
+# polarization-resolved), photons above 1 MeV go into the species `photons`, the spin precesses (T-BMT) and flips.
+# out_qed_collision/qed.txt: <S>, <chi>, emitted energy, mean Stokes vector; qed_spectrum.txt: dN/du, dN/d eps with <xi>.
+#   build/vlpl examples/qed_collision.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 300             # 12 um, lambda0 / 20
+  ny         = 24              # 3.84 um
+  nz         = 24
+  dx         = 0.04 um
+  dy         = 0.16 um
+  dz         = 0.16 um
+  boundary_x = open
+  t_end      = 40 fs
+}
+
+numerics {
+  shape = 2
+  seed  = 5
+}
+
+laser {
+  a0           = 100
+  polarization = y
+  duration     = 8 fs
+  waist        = 1.5 um
+  waist_z      = 1.5 um
+  focus        = 3 um            # the pulse peak (delay 16 fs) meets the beam centre near x = 2.7 um
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 1e-4               # n_c: the beam's own fields stay negligible
+  ux      = -1957              # 1 GeV, towards the laser
+  xmin    = 9.5 um
+  xmax    = 11 um
+  ymin    = 1.42 um
+  ymax    = 2.42 um
+  zmin    = 1.42 um
+  zmax    = 2.42 um
+  ppc_x   = 2
+  spin    = 0 0 1
+}
+
+species photons {
+  kind = photon
+}
+
+qed {
+  species           = electrons
+  photons           = photons
+  photon_min_energy = 1        # MeV
+  spectrum_bins     = 100
+}
+
+output {
+  dir   = out_qed_collision
+  every = 20
+}

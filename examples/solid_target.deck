@@ -1,0 +1,74 @@
+# O4 solid-density target (docs/specs/solid_target.md): a p-polarised pulse at 45 deg to x through a TFSF plane onto a
+# foil tilted by 22.5 deg, so that the specular reflection leaves along -x (the dispersionless axis); 30 n_c with an
+# exponential pre-plasma of lambda0/20, mobile protons, cubic shapes and one pass of the Gauss-law-exact current filter.
+# The reflected field is recorded at the inner face of the left absorber (output.xflux_every, tools/xflux.py).
+#   build/vlpl examples/solid_target.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 1200            # 24 um, 40 cells per wavelength along x (c dt = dx)
+  ny         = 400             # 20 um, periodic
+  nz         = 8
+  dx         = 0.02 um
+  dy         = 0.05 um
+  dz         = 0.4 um
+  boundary_x = absorbing
+  x_absorber_width = 2 um
+  t_end      = 100 fs
+}
+
+numerics {
+  shape         = 3
+  filter_passes = 1
+  filter        = projection   # the longitudinal current only: the harmonics radiate unfiltered (decisions 69, 91)
+}
+
+laser {
+  a0           = 3
+  polarization = y             # in the plane of incidence (x, y)
+  duration     = 6 fs
+  delay        = 33 fs         # the peak crosses the plane then; at t = 0 the pulse lies between the absorber and the plane
+  waist        = 2 um
+  waist_z      = 0 um          # uniform in z
+  focus        = 5.657 um      # along the beam, beyond the plane: on the foil
+  y_center     = 12 um
+  tfsf_x       = 15 um
+  angle        = 45 deg
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 30                 # n_c (omega_p dt = 0.86)
+  slab_x0 = 19 um
+  slab_y0 = 16 um
+  slab_angle = 22.5 deg        # normal (cos, sin) into the foil: the specular direction of a 45 deg beam is -x
+  slab_thickness = 0.5 um
+  slab_ramp = 0.04 um          # front pre-plasma, lambda0 / 20
+  slab_ramp_extent = 0.2 um
+  ymin    = 13 um
+  ymax    = 19 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 30
+  slab_x0 = 19 um
+  slab_y0 = 16 um
+  slab_angle = 22.5 deg
+  slab_thickness = 0.5 um
+  slab_ramp = 0.04 um
+  slab_ramp_extent = 0.2 um
+  ymin    = 13 um
+  ymax    = 19 um
+  ppc_x   = 2
+  ppc_y   = 2
+}
+
+output {
+  dir   = out_solid
+  every = 20
+  xflux_every = 1
+}

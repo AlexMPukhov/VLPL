@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use VLPL, please cite the software as below and the method papers in the README."
+title: "VLPL: electromagnetic particle-in-cell code with the RIP / iRIP field solvers"
+type: software
+authors:
+  - family-names: Pukhov
+    given-names: Alexander
+    affiliation: "Heinrich-Heine-Universität Düsseldorf, Institut für Theoretische Physik I"
+    orcid: "https://orcid.org/0000-0001-5043-960X"
+license: BSD-3-Clause
+repository-code: "https://github.com/AlexMPukhov/VLPL"
+version: "1.0.0"
+date-released: "2026-11-30"
+keywords:
+  - particle-in-cell
+  - plasma physics
+  - laser-plasma interaction
+  - Maxwell solver
+  - GPU
+references:
+  - type: article
+    authors:
+      - family-names: Pukhov
+        given-names: Alexander
+    title: "X-dispersionless Maxwell solver for plasma-based particle acceleration"
+    journal: "Journal of Computational Physics"
+    volume: 418
+    start: 109622
+    year: 2020
+    doi: "10.1016/j.jcp.2020.109622"

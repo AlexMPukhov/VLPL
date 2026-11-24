@@ -1,0 +1,52 @@
+# A focused, p-polarised pulse at 30 deg to x through a TFSF plane (docs/specs/tfsf.md) onto a thin plasma slab: the
+# reflected and transmitted fields and the plasma response right of the plane, only the scattered (reflected) field left
+# of it, which leaves through the open left edge and is recorded there (output.xflux, docs/specs/xflux.md).
+#   build/vlpl examples/tfsf_oblique.deck
+grid {
+  lambda0    = 0.8 um
+  nx         = 480             # 12 um, 32 cells per wavelength along x (c dt = dx)
+  ny         = 96              # 9.6 um, periodic
+  nz         = 8
+  dx         = 0.025 um
+  dy         = 0.1 um
+  dz         = 0.4 um
+  boundary_x = open
+  t_end      = 70 fs
+}
+
+laser {
+  a0           = 0.5
+  polarization = y             # in the plane of incidence (x, y)
+  duration     = 6 fs
+  delay        = 25 fs         # the peak crosses the plane at (tfsf_x, y_center) then; the pulse starts left of it
+  waist        = 1.5 um
+  waist_z      = 0 um          # uniform in z
+  focus        = 1 um          # along the beam, beyond the plane
+  tfsf_x       = 8.5 um
+  angle        = 30 deg
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 4                  # n_c
+  xmin    = 10 um
+  xmax    = 10.5 um
+  ppc_x   = 2
+}
+
+species protons {
+  charge  = 1
+  mass    = 1836
+  mobile  = false
+  density = 4
+  xmin    = 10 um
+  xmax    = 10.5 um
+  ppc_x   = 2
+}
+
+output {
+  dir   = out_tfsf
+  every = 20
+  xflux = true
+}

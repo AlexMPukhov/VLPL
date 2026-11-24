@@ -1,0 +1,51 @@
+# Field ionization (docs/specs/field_ionization.md, decision 86): an a0 = 2 pulse (8 fs, waist 1.5 um) enters a nitrogen gas
+# (1.7e18 cm^-3 atoms, 1e-3 n_c) through the open left edge and ionizes it to N5+ on its leading edge, partly to N6+ near the
+# peak (ADK with the NIST energies, Monte Carlo, several levels per step). The new electrons go into the species `electrons`;
+# the ionization current takes the ionization energy from the laser. out_ionization_2d/ionization.txt: the energy taken
+# (E_ion, E_cur), W_field + W_kin + E_cur (conserved), the charge-state distribution (sums of weights).
+#   build/vlpl examples/ionization_2d.deck
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 320             # 8 um, lambda0 / 32
+  ny         = 64              # 3.2 um, periodic
+  dx         = 0.025 um
+  dy         = 0.05 um
+  boundary_x = open
+  t_end      = 30 fs
+}
+
+numerics {
+  shape = 2
+}
+
+laser {
+  a0           = 2
+  polarization = y
+  duration     = 8 fs
+  waist        = 1.5 um
+  focus        = 4 um
+}
+
+species nitrogen {
+  element              = N
+  ionization           = adk
+  ionization_electrons = electrons
+  density              = 1e-3   # atoms, n_c
+  xmin                 = 2 um
+  xmax                 = 7 um
+  ppc_x                = 2
+  ppc_y                = 2
+  mobile               = false
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 0
+}
+
+output {
+  dir   = out_ionization_2d
+  every = 40
+}

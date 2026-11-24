@@ -1,0 +1,58 @@
+# Track O benchmark 1 (docs/specs/overdense.md, Gate O): 1D-like relativistic oscillating mirror (ROM) harmonics.
+# A plane, linearly polarised pulse (a0 = 20) at normal incidence on 50 n_c with a short exponential pre-plasma
+# (L = 0.1 lambda0; S = n / (a0 n_c) = 2.5, the relativistic-spikes regime; Baeva, Gordienko, Pukhov, PRE 74, 046404
+# (2006)): the reflected spectrum must converge in
+# dx and follow I(omega) ~ omega^(-8/3) up to the order the grid resolves. Quasi-1D: y, z periodic with 4 cells.
+# The reflected field is recorded at x = 0 (output.xflux_every, docs/specs/xflux.md); spectrum.py analyses it.
+#   build/vlpl bench/rom_harmonics/rom.deck grid.dx=0.004um        (lambda0 / 200; also / 100, / 400)
+grid {
+  lambda0    = 0.8 um
+  nx         = 1000            # 4 um at dx = lambda0 / 200: 2 um vacuum, 2 um target (scale nx with 1 / dx)
+  ny         = 4
+  nz         = 4
+  dx         = 0.004 um        # c dt = dx; omega_p dt = 2 pi sqrt(50) dx / lambda0 = 0.22
+  dy         = 0.1 um
+  dz         = 0.1 um
+  boundary_x = open
+  t_end      = 75 fs
+}
+
+numerics {
+  solver = irip
+  shape  = 2
+}
+
+laser {
+  a0           = 20
+  polarization = y
+  duration     = 8 fs          # intensity FWHM, 3 cycles
+  delay        = 18 fs
+  waist        = 1e6 um        # plane
+}
+
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 50                 # n_c
+  density_function = x < 2 um ? exp((x - 2 um) / (0.08 um)) : 1   # pre-plasma L = 0.1 lambda0 from 1 um
+  xmin    = 1 um
+  xmax    = 4 um
+  ppc_x   = 8
+}
+
+species ions {
+  charge  = 1
+  mass    = 3672
+  mobile  = false
+  density = 50
+  density_function = x < 2 um ? exp((x - 2 um) / (0.08 um)) : 1
+  xmin    = 1 um
+  xmax    = 4 um
+  ppc_x   = 8
+}
+
+output {
+  dir         = out_rom
+  every       = 50
+  xflux_every = 1
+}

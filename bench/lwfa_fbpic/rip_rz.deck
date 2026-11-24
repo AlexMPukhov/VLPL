@@ -1,0 +1,61 @@
+# LWFA benchmark, RZ version (bench/lwfa_fbpic/README.md): the setup of rip.deck and fbpic_lwfa.py on
+# FBPIC's grid (RZ, 2 modes, Nr = 36, dr = 0.25 um, the same 2 x 2 x 4 particles per cell, shape 2). Run with
+#   build/vlpl bench/lwfa_fbpic/rip_rz.deck
+#   python3 bench/lwfa_fbpic/compare_rz.py out_bench_rip_rz out_bench_fbpic
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 256             # 12.8 um, dz = lambda / 16 (c dt = dz)
+  nr         = 36              # 9 um: FBPIC's r_max (conducting wall here, reflective there)
+  dz         = 0.05 um
+  dr         = 0.25 um
+  boundary_z = open
+  t_end      = 300.3 fs        # 1800 steps
+}
+
+numerics {
+  solver = rip_cc              # dz^2 (lambda_max + wp^2) / 4 ~ 0.03
+  shape  = 2                   # as the 3D run (shape 1: noisier on the axis, README)
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 1
+  polarization = x             # as FBPIC's default
+  duration     = 10 fs         # intensity FWHM; delay 20 fs
+  waist        = 4 um          # focus at z = 0
+}
+
+window {
+  start = 40 fs
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.01
+  zmin      = 13 um
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 4
+  density_function = z < 20 um ? (z - 13 um) / (7 um) : 1
+}
+
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.01
+  zmin      = 13 um
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 4
+  density_function = z < 20 um ? (z - 13 um) / (7 um) : 1
+}
+
+output {
+  dir            = out_bench_rip_rz
+  every          = 60
+  openpmd_every  = 300         # 50 fs
+  openpmd_fields = E
+}

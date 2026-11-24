@@ -1,0 +1,47 @@
+# VLPL side of the collision benchmark "beam" against Smilei 5.1 (bench/collisions_smilei/README.md): the parameters of
+# smilei_coll.py (CASE=beam), frozen species (mobile = false): only the collisions act. Output: collisions.txt.
+grid {
+  geometry = cartesian2d
+  lambda0 = 1 um
+  nx = 14
+  ny = 4
+  dx = 0.2 um
+  dy = 0.4 um
+  dz = 1 um
+  t_end = 133.426 fs
+}
+numerics {
+  seed = 7
+}
+species electron {
+  charge = -1
+  mass = 1
+  mobile = false
+  density = 10
+  ppc_x = 25
+  ppc_y = 40
+  ux = 0.0500626174
+  uth_x = 0.000447213595
+  uth_y = 0.000447213595
+  uth_z = 0.000447213595
+}
+species ion {
+  charge = 1
+  mass = 10
+  mobile = false
+  density = 10
+  ppc_x = 25
+  ppc_y = 40
+  uth_x = 0.00141421356
+  uth_y = 0.00141421356
+  uth_z = 0.00141421356
+}
+collisions ei {
+  species1 = electron
+  species2 = ion
+  coulomb_log = 3
+}
+output {
+  dir = out_vlpl_beam
+  every = 10
+}

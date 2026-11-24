@@ -1,0 +1,12 @@
+f_i_g10_h025_s2_f6L4x irip 2 6 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_flat=4 numerics.filter_axes=x output.openpmd_every=0
+f_i_g10_h025_s2_f8L4x irip 2 8 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_flat=4 numerics.filter_axes=x output.openpmd_every=0
+f_i_g10_h025_s2_f12L6x irip 2 12 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_flat=6 numerics.filter_axes=x output.openpmd_every=0
+f_i_g10_h025_s2_f8cx_new irip 2 8 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x output.openpmd_every=0
+f_i_g10_h025_s2_imp_f0 irip 2 0 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.mover=implicit output.openpmd_every=0
+f_i_g10_h025_s2_imp_f8L4x irip 2 8 10 0.004 32 0.25 1e-2 128 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.mover=implicit numerics.filter_flat=4 numerics.filter_axes=x output.openpmd_every=0
+f_i_g5_h025_s2_f6L4x irip 2 6 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_flat=4 numerics.filter_axes=x output.openpmd_every=0
+f_i_g5_h025_s2_f8L4x irip 2 8 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_flat=4 numerics.filter_axes=x output.openpmd_every=0
+f_i_g5_h025_s2_f12L6x irip 2 12 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_flat=6 numerics.filter_axes=x output.openpmd_every=0
+f_i_g5_h025_s2_f8cx_new irip 2 8 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.filter_compensate=true numerics.filter_axes=x output.openpmd_every=0
+f_i_g5_h025_s2_imp_f0 irip 2 0 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.mover=implicit output.openpmd_every=0
+f_i_g5_h025_s2_imp_f8L4x irip 2 8 5 0.004 32 0.25 1e-2 128 'species electrons.uth_x=5e-3' 'species electrons.uth_y=1e-3' 'species electrons.uth_z=1e-3' numerics.mover=implicit numerics.filter_flat=4 numerics.filter_axes=x output.openpmd_every=0

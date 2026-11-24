@@ -1,0 +1,18 @@
+# GEM-PIC-RZ reference for bench/flying_focus/rip_vacuum.deck (VLPL): the same luminal Bessel pulse (a0 = 1,
+# cone 0.2 rad, 20 fs, 45 um window, 0.3 mm), fed through the radial absorber layer (16 ... 24 um).
+#   gempic_rz gem_vacuum.deck && python3 <GEM-PIC-RZ>/benchmarks/flying_focus/check_axis.py gem_ff_out 1 0.2 20 22.5
+grid {
+  lambda0       = 0.8 um
+  m_max         = 1
+  radial_grid   = uniform
+  dr            = 0.4 um         # lambda_perp / 10
+  r_max         = 24 um
+  r_absorber    = 16 um
+  dzeta         = 0.03333 um     # lambda / 24
+  window_length = 45 um
+  dz            = 0.5 um
+  z_end         = 0.3 mm
+}
+flying_focus { a0 = 1; cone_angle = 200 mrad; tau_fwhm = 20 fs; zeta_center = 22.5 um }
+output { dir = gem_ff_out; every = 60; particles = false }
+numerics { iterations = 1 }

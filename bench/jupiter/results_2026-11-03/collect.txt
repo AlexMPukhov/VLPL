@@ -1,0 +1,22 @@
+| case | run | ranks (x y z) | steps | s/step | speed-up | efficiency | per operator, ms/step | exchanges, ms/step: guard cells (MPI wait), particles |
+|---|---|---|---|---|---|---|---|---|
+| bubble_strong | 1 GPU | 1x1x1 | 1799 | 0.0615 |  |  | push_deposit 56.55, rip_cc 1.75, moving_window 0.25, migrate 2.79, beam_diag 0.01, other 0.19 | 0.14 (0.00), 0.01 |
+| bubble_strong | 4 GPU | 2x2x1 | 1799 | 0.0292 | 2.11 | 53 % | push_deposit 18.48, rip_cc 5.34, moving_window 0.33, migrate 4.94, beam_diag 0.01, other 0.07 | 24.32 (10.77), 2.11 |
+| bubble_strong | 4 GPU CUDA-aware | 2x2x1 | 1799 | 0.0233 | 2.64 | 66 % | push_deposit 17.35, rip_cc 0.99, moving_window 0.07, migrate 4.84, beam_diag 0.01, other 0.07 | 18.67 (5.95), 2.12 |
+| bubble_strong | 16 GPU | 4x2x2 | 1799 | 0.0138 | 4.45 | 28 % | push_deposit 5.25, rip_cc 4.79, moving_window 0.20, migrate 3.59, beam_diag 0.01, other 0.04 | 10.22 (6.18), 2.44 |
+| bubble_strong | 16 GPU CUDA-aware | 4x2x2 | 1799 | 0.0105 | 5.86 | 37 % | push_deposit 4.57, rip_cc 2.18, moving_window 0.13, migrate 3.60, beam_diag 0.01, other 0.04 | 7.00 (3.70), 2.23 |
+| bubble_weak | 1 GPU | 1x1x1 | 1799 | 0.0615 |  |  | push_deposit 56.51, rip_cc 1.76, moving_window 0.26, migrate 2.80, beam_diag 0.01, other 0.19 | 0.14 (0.00), 0.01 |
+| bubble_weak | 4 GPU | 1x2x2 | 1799 | 0.0843 |  | 73 % (weak) | push_deposit 61.92, rip_cc 18.42, moving_window 0.63, migrate 3.09, beam_diag 0.01, other 0.22 | 80.52 (20.37), 0.21 |
+| bubble_weak | 4 GPU CUDA-aware | 1x2x2 | 1799 | 0.0646 |  | 95 % (weak) | push_deposit 57.97, rip_cc 2.71, moving_window 0.63, migrate 3.08, beam_diag 0.01, other 0.21 | 60.87 (2.48), 0.21 |
+| bubble_weak | 16 GPU | 1x4x4 | 1799 | 0.0781 |  | 79 % (weak) | push_deposit 59.73, rip_cc 14.36, moving_window 0.62, migrate 3.14, beam_diag 0.01, other 0.24 | 74.36 (44.51), 0.47 |
+| bubble_weak | 16 GPU CUDA-aware | 1x4x4 | 1799 | 0.0666 |  | 92 % (weak) | push_deposit 57.94, rip_cc 4.76, moving_window 0.63, migrate 3.06, beam_diag 0.01, other 0.21 | 62.93 (34.96), 0.40 |
+| rz_nm10 | 1 GPU | 1x1x1 | 2600 | 0.0168 |  |  | rz_push_deposit 13.24, rz_fields 2.73, moving_window 0.43, migrate 0.30, other 0.13 | 0.27 (0.00), 0.00 |
+| rz_nm10 | 4 GPU | 4x1x1 | 2600 | 0.0110 | 1.53 | 38 % | rz_push_deposit 5.62, rz_fields 4.11, moving_window 0.23, migrate 0.93, other 0.08 | 6.72 (2.66), 0.62 |
+| rz_nm10 | 4 GPU CUDA-aware | 4x1x1 | 2600 | 0.0104 | 1.62 | 40 % | rz_push_deposit 5.48, rz_fields 3.73, moving_window 0.12, migrate 0.98, other 0.08 | 6.20 (2.37), 0.65 |
+| rz_nm10 | 16 GPU | 16x1x1 | 2600 | 0.0070 | 2.41 | 15 % | rz_push_deposit 1.98, rz_fields 4.12, moving_window 0.23, migrate 0.60, other 0.03 | 3.85 (1.47), 0.60 |
+| rz_nm10 | 16 GPU CUDA-aware | 16x1x1 | 2600 | 0.0063 | 2.65 | 17 % | rz_push_deposit 1.80, rz_fields 3.80, moving_window 0.13, migrate 0.60, other 0.04 | 3.28 (1.36), 0.62 |
+
+speed-up: t(1 GPU) / t; for the CPU rows t(1 GPU) / t(CPU node), i.e. < 1 when one GPU is faster than the node.
+exchanges: the slowest rank's time in the guard-cell exchanges (packing, copies and MPI; in brackets the
+MPI wait alone) and in the particle messages; empty for logs of versions before the exchange report.
+weak: bubble_weak on N GPUs has N times the cells and particles of bubble_strong on 1 GPU (efficiency t1 / tN).

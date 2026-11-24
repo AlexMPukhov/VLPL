@@ -1,0 +1,42 @@
+# O7, model = bound (decision 85, docs/specs/linear_medium.md "Bound electrons"): an 800 nm pulse through Rb vapour as V-type
+# Maxwell-Bloch atoms (D1 795 nm, D2 780 nm built in). At a0 = 1e-3 (2e12 W/cm^2) the Rabi frequency of D2 (0.33 omega0) is far
+# above the detunings (0.006, 0.025 omega0): the transitions saturate, a Lorentz model does not apply. 2D, iRIP, open x, CPML in y.
+# dir/medium.txt: K (the atoms' energy), the balance W + K, the GMRES and outer-iteration statistics.
+#   build/vlpl examples/rb_gas_2d.deck
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 600             # 20 lambda, lambda / 30
+  ny         = 192             # 6.4 lambda
+  dx         = 0.02667 um
+  dy         = 0.02667 um
+  boundary_x = open
+  boundary_y = pml
+  t_end      = 80 fs
+}
+
+numerics {
+  solver = irip
+}
+
+laser {
+  a0           = 1e-3
+  polarization = z
+  duration     = 10 fs
+  delay        = 12 fs
+  waist        = 1.6 um
+  y_center     = 2.56 um
+}
+
+medium rb {
+  model        = bound
+  atom         = Rb
+  density      = 1e18 cm^-3    # n_a = 5.7e-4 n_c at 800 nm
+  polarization = z             # the dipole axis (the laser polarization)
+  profile      = x > 4 um && x < 14 um && y > 0.6 um && y < 4.5 um   # one cell clear of the CPML layers (16 cells)
+}
+
+output {
+  dir   = out_rb_gas_2d
+  every = 30
+}

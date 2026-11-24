@@ -1,0 +1,56 @@
+# Handover test 2 (bench/rz_dielectric/README.md): dielectric wakefield accelerator. A metal tube of radius b = 75 um (the
+# conducting wall of the grid) lined with eps = 3.8 for a = 50 um < r < b from z = 0.95 mm on; a rigid 100 pC bunch at gamma =
+# 1000 (sigma_z 10 um, sigma_r 5 um, its steady self-field in the vacuum tube at the start) on the axis. dwa.py compares E_z
+# on the axis behind the bunch with the modal theory of the tube (TM_0n wavenumbers and loss factors).
+#   build/vlpl bench/rz_dielectric/dwa.deck  &&  python3 bench/rz_dielectric/dwa.py out_dwa 3.8
+grid {
+  geometry   = rz
+  modes      = 1
+  lambda0    = 100 um
+  nz         = 2500              # 1 mm window
+  nr         = 150               # the wall at b = 75 um
+  dz         = 0.4 um
+  dr         = 0.5 um
+  boundary_z = open
+  t_end      = 20 ps             # 6 mm: the bunch 5.9 mm inside the lined section (all modes filled)
+}
+
+numerics {
+  solver = rip_cc
+  pusher = boris
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+dielectric layer {
+  r_in    = 50 um
+  r_out   = 80 um                # beyond the wall
+  z_start = 0.95 mm
+  z_end   = 100 mm
+  eps     = 3.8
+}
+
+species bunch {
+  charge     = 1
+  mass       = 18361526.7        # proton mass x 1e4 (rigid)
+  density    = 1.42186           # 100 pC: N = 6.2415e8 over (2 pi)^1.5 sigma_z sigma_r^2, n_c(100 um) = 1.1149e23 m^-3
+  density_function = gauss(z - 0.85 mm, 10 um) * gauss(r, 5 um)
+  zmin       = 0.81 mm
+  zmax       = 0.89 mm
+  rmax       = 20 um
+  uz         = 999.9995          # gamma = 1000
+  self_field = true
+  ppc_z      = 1
+  ppc_r      = 2
+  ppc_theta  = 1
+}
+
+output {
+  dir        = out_dwa
+  every      = 1000
+  plane_z    = 100 mm            # (no crossing: only for the meta file of the axis records)
+  axis_every = 2500
+}

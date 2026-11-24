@@ -1,0 +1,42 @@
+# O7 (docs/specs/linear_medium.md, decision 84): a parabolic plasma mirror as a particle-free Drude medium (100 n_c,
+# omega_p dt = 3.9: beyond the explicit limit), 2D, iRIP. The s-polarised pulse enters through the open left edge and is
+# focused at x = 14 - 4 = 10 lambda (f = 4 lambda); CPML layers in y. dir/medium.txt: K, the dissipated energy, the balance,
+# the GMRES statistics.
+#   build/vlpl examples/plasma_mirror_2d.deck
+grid {
+  geometry   = cartesian2d
+  lambda0    = 0.8 um
+  nx         = 272             # 17 lambda, lambda / 16
+  ny         = 256             # 16 lambda
+  dx         = 0.05 um
+  dy         = 0.05 um
+  boundary_x = open
+  boundary_y = pml
+  t_end      = 60 fs
+}
+
+numerics {
+  solver = irip
+}
+
+laser {
+  a0           = 1
+  polarization = z
+  duration     = 8 fs
+  delay        = 10 fs
+  waist        = 2.4 um        # 3 lambda, plane phase fronts at the entrance
+  y_center     = 6.4 um
+}
+
+medium mirror {
+  model    = drude
+  density  = 100               # n_c: wp^2 / omega0^2
+  collision_frequency = 0.01   # nu / omega0
+  profile  = x > 11.2 um - (y - 6.4 um)^2 / (12.8 um) && abs(y - 6.4 um) < 5.4 um   # vertex 14 lambda, f = 4 lambda;
+                                                     # kept out of the CPML layers (16 cells)
+}
+
+output {
+  dir   = out_plasma_mirror_2d
+  every = 20
+}

@@ -1,0 +1,65 @@
+# A relativistic bunch through a closed disk-loaded waveguide (block rings with a jacket, docs/specs/rz_metal.md): iris
+# aperture r_in = 0.8 mm, disks out to r_out = 1.0 mm, 100 um thick, period 250 um (gap 150 um), an outer wall (jacket) of
+# 60 um; the guide runs from z = 6 mm to 106 mm and ends open, vacuum around it with a radial absorber.
+# dz = 2.09 um, dr = 2.5 um (below the RIP-CC limit 2.27 um of this grid). A 1 nC proton bunch at gamma = 10
+# (sigma 50 um; mass x 1e4: practically rigid, the energy it loses is still the work of the field) with its steady
+# self-field starts in vacuum before the guide; the window moves at c. The field crossing the plane z = 110 mm (4 mm
+# behind the open end) is recorded every step (dir/plane), Ez on the axis every 4000 steps.
+#   build/vlpl examples/rz_disk_loaded.deck                  (the vacuum reference: rings.z_start=1000mm rings.z_end=1001mm)
+grid {
+  geometry   = rz
+  modes      = 1                 # the bunch is on the axis: m = 0
+  lambda0    = 100 um            # the unit of length 1/k0 = 15.9 um (no laser)
+  nz         = 2420              # 5.06 mm window
+  nr         = 711
+  dz         = 2.09090909 um
+  dr         = 2.5 um            # uniform to 1.12 mm, then x 1.03 per cell up to 25 um: R = 6.5 mm
+  r_uniform  = 1.12 mm
+  stretch    = 1.03
+  dr_max     = 25 um
+  boundary_z = open
+  boundary_r = absorbing         # 32 cells (0.8 mm) of radial absorber
+  t_end      = 374 ps            # the window has passed the plane at 110 mm
+}
+
+numerics {
+  solver = rip_cc                # dz^2 lambda_max / 4 ~ 0.85
+  pusher = boris
+}
+
+window {
+  start    = 0 fs
+  velocity = 1
+}
+
+rings {
+  r_in    = 0.8 mm
+  r_out   = 1.0 mm
+  period  = 250 um
+  gap     = 150 um
+  z_start = 6 mm
+  z_end   = 106 mm
+  jacket  = 60 um                # outer wall 1.0 .. 1.06 mm: a closed guide
+}
+
+species bunch {
+  charge     = 1
+  mass       = 18361526.7        # proton mass x 1e4
+  density    = 0.028436          # 1 nC: n_c(100 um) = 1.1149e23 m^-3, (2 pi)^1.5 sigma^3
+  density_function = gauss(z - 4.26 mm, 50 um) * gauss(r, 50 um)
+  zmin       = 3.96 mm
+  zmax       = 4.56 mm
+  rmax       = 0.3 mm
+  uz         = 9.9498744         # gamma = 10
+  self_field = true
+  ppc_z      = 1
+  ppc_r      = 2
+  ppc_theta  = 1
+}
+
+output {
+  dir        = out_rz_disk_loaded
+  every      = 1000
+  plane_z    = 110 mm
+  axis_every = 4000
+}

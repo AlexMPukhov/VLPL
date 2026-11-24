@@ -1,0 +1,80 @@
+# RZ laser wakefield with many azimuthal modes (bench/fbpic_nm_scan/README.md): FBPIC's LWFA example in VLPL-iRZ.
+# Every number as in that example; coordinates: VLPL z = FBPIC z + 10 um (the box starts at 0).
+#   grid.modes = Nm, ppc_theta = 4 Nm of both species (FBPIC p_nt = 4 Nm):
+#   build/vlpl bench/fbpic_nm_scan/rip_rz.deck grid.modes=10 "species electrons.ppc_theta=40" "species ions.ppc_theta=40"
+# Time: FBPIC starts (t = 0) with the pulse centred at z0 = 15 um (here 25 um) and focused there (zf = z0).
+# Here it enters through the left edge: its peak passes z = 0 at the delay 50 fs and reaches 25 um at
+# T0 = 50 fs + 25 um / c = 133.39 fs, where the window starts to move at c (FBPIC: from t = 0). FBPIC time
+# t = t_here - T0; FBPIC runs T_interact = (50 + 40) um / c = 300.21 fs, so t_end = T0 + 300.21 fs (1800 steps
+# after T0, 800 before).
+grid {
+  geometry   = rz
+  modes      = 10              # FBPIC Nm (m = 0 .. Nm - 1)
+  lambda0    = 0.8 um          # FBPIC default
+  nz         = 800             # z in [0, 40] um (FBPIC [-10, 30] um)
+  nr         = 50
+  dz         = 0.05 um         # c dt = dz (FBPIC dt = dz / c)
+  dr         = 0.4 um          # rmax = 20 um, dr = 8 c dt
+  boundary_z = open
+  boundary_r = wall            # FBPIC 'reflective'
+  t_end      = 433.60 fs       # T0 + 300.21 fs
+}
+
+numerics {
+  solver = irip                # dr = 8 c dt: RIP-CC only for small Nm (rz_lambda_max is checked)
+  shape  = 1                   # FBPIC's default particle shape is linear; repeat with 2
+  filter_passes = 2            # current filter (binomial, decision 91): the near-axis noise at FBPIC's level (FBPIC: its
+                               # default filter; VLPL's axis node has 1/4 of FBPIC's first-cell volume)
+}
+
+laser {
+  a0           = 4
+  polarization = x             # FBPIC theta_pol = 0
+  duration     = 18.8386 fs    # intensity FWHM = FBPIC tau sqrt(2 ln 2), tau = 16 fs (1/e field half width)
+  delay        = 50 fs
+  waist        = 5 um
+  focus        = 25 um         # FBPIC zf = z0 = 15 um
+}
+
+window {
+  start    = 133.391 fs        # T0
+  velocity = 1
+}
+
+# n_e = 4e18 cm^-3 = 2.2963e-3 n_c at 0.8 um; linear ramp 30 .. 70 um (here 40 .. 80 um), flat to 500 um (510 um),
+# r < 18 um; 2 x 2 x 4 Nm particles per cell
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 2.2963e-3
+  zmin      = 40 um
+  zmax      = 510 um
+  rmax      = 18 um
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 40
+  density_function = z < 80 um ? (z - 40 um) / (40 um) : 1
+}
+
+# FBPIC has electrons only (the ions are an implicit static background): immobile ions at the same positions
+species ions {
+  charge    = 1
+  mass      = 1836
+  mobile    = false
+  density   = 2.2963e-3
+  zmin      = 40 um
+  zmax      = 510 um
+  rmax      = 18 um
+  ppc_z     = 2
+  ppc_r     = 2
+  ppc_theta = 40
+  density_function = z < 80 um ? (z - 40 um) / (40 um) : 1
+}
+
+output {
+  dir             = out_b7
+  every           = 10         # diag.txt and rz_modes.txt (W and the Gauss change per mode)
+  openpmd_every   = 50         # as FBPIC's FieldDiagnostic
+  openpmd_fields  = E B rho_electrons   # FBPIC writes the electrons only (rho)
+  openpmd_species = none
+}

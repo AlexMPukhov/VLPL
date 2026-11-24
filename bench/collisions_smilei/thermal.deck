@@ -1,0 +1,54 @@
+# VLPL side of the collision benchmark "thermal" against Smilei 5.1 (bench/collisions_smilei/README.md): the parameters of
+# smilei_coll.py (CASE=thermal), frozen species (mobile = false): only the collisions act. Output: collisions.txt.
+grid {
+  geometry = cartesian2d
+  lambda0 = 1 um
+  nx = 10
+  ny = 4
+  dx = 0.2 um
+  dy = 0.4 um
+  dz = 1 um
+  t_end = 66.713 fs
+}
+numerics {
+  seed = 7
+}
+species electron {
+  charge = -1
+  mass = 1
+  mobile = false
+  density = 10
+  ppc_x = 100
+  ppc_y = 125
+  uth_x = 0.0141421356
+  uth_y = 0.0141421356
+  uth_z = 0.0141421356
+}
+species ion {
+  charge = 1
+  mass = 10
+  mobile = false
+  density = 10
+  ppc_x = 100
+  ppc_y = 125
+  uth_x = 0.0042426407
+  uth_y = 0.0042426407
+  uth_z = 0.0042426407
+}
+collisions ei {
+  species1 = electron
+  species2 = ion
+  coulomb_log = 5
+}
+collisions ee {
+  species1 = electron
+  coulomb_log = 1000
+}
+collisions ii {
+  species1 = ion
+  coulomb_log = 1000
+}
+output {
+  dir = out_vlpl_thermal
+  every = 5
+}

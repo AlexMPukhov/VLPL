@@ -1,0 +1,27 @@
+dy = 2 dx (lambda = 16 dx), layer 24 cells; max interior error / amplitude
+     phi  pol       cpml   cpml k,a     sponge
+      90   TE   9.27e-07   3.57e-04   1.45e-04
+      90   TM   8.99e-07   3.71e-04   1.44e-04
+      60   TE   2.30e-06   1.78e-04   2.22e-03
+      60   TM   2.18e-06   1.73e-04   2.16e-03
+      45   TE   2.81e-05   6.30e-05   1.18e-02
+      45   TM   2.70e-05   6.27e-05   1.17e-02
+      30   TE   5.19e-04   2.75e-05   4.82e-02
+      30   TM   4.91e-04   2.59e-05   4.72e-02
+      20   TE   3.33e-03   6.55e-04   9.14e-02
+      20   TM   3.21e-03   6.27e-04   8.99e-02
+dy = 5 dx (lambda = 16 dx), layer 24 cells; max interior error / amplitude
+     phi  pol       cpml   cpml k,a     sponge
+      90   TE   9.02e-05   5.22e-02   9.09e-05
+      90   TM   8.88e-05   5.14e-02   9.14e-05
+      60   TE   3.76e-05   6.56e-02   1.27e-04
+      60   TM   3.26e-05   5.77e-02   9.35e-05
+      45   TE   6.19e-06   5.00e-02   7.82e-04
+      45   TM   5.53e-06   4.72e-02   6.96e-04
+      30   TE   1.79e-04   2.25e-02   8.87e-03
+      30   TM   1.62e-04   2.15e-02   8.09e-03
+      20   TE   2.41e-03   8.96e-03   3.32e-02
+      20   TM   2.23e-03   8.70e-03   3.19e-02
+stability cpml   {}                           energy / initial every 500 steps: 1.0e+00 5.2e-01 4.7e-01 4.5e-01 4.3e-01 4.3e-01 4.2e-01 4.2e-01 4.1e-01 4.1e-01
+stability cpml   {'kmax': 4.0, 'amax': 0.05}  energy / initial every 500 steps: 1.0e+00 6.4e-01 5.9e-01 5.6e-01 5.5e-01 5.3e-01 5.2e-01 5.1e-01 5.1e-01 5.0e-01
+stability sponge {}                           energy / initial every 500 steps: 9.2e-01 3.0e-01 2.6e-01 2.4e-01 2.4e-01 2.3e-01 2.3e-01 2.2e-01 2.2e-01 2.2e-01

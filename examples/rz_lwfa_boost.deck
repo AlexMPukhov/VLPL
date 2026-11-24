@@ -1,0 +1,70 @@
+# The RZ laser wakefield of examples/rz_lwfa.deck in a Lorentz-boosted frame (docs/specs/boosted_frame.md):
+# the deck is the lab deck plus the blocks boost and lab_diagnostics. gamma = 2 stretches dz to 0.187 um (the same
+# 16 cells per Doppler-shifted wavelength), the plasma (at rest in the lab) streams through the window at
+# -0.866 c, and lab_diagnostics writes the fields at the lab times 100, 150, 200 fs (out_rz_lwfa_boost/lab_fields,
+# tools/lab_fields.py) and the lab-frame moments of the electrons with gamma >= 1.2 (lab_beams.txt).
+#   build/vlpl examples/rz_lwfa_boost.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 0.8 um
+  nz         = 256             # 12.8 um in the lab, 47.8 um in the boosted frame
+  nr         = 32
+  dz         = 0.05 um         # lab; boosted dz = gamma (1 + beta) dz = 0.187 um
+  dr         = 0.2 um
+  boundary_z = open
+  t_end      = 200 fs          # lab time: the run ends when the lab time 200 fs has left the box
+}
+
+boost {
+  gamma = 2
+}
+
+lab_diagnostics {
+  t_first   = 100 fs
+  t_every   = 50 fs
+  count     = 3
+  species   = electrons
+  gamma_min = 1.2
+}
+
+numerics {
+  solver = irip                # RIP-CC in RZ needs dr well above the boosted dz (lambda_max near the axis)
+  pusher = higuera_cary
+}
+
+laser {
+  a0           = 2.5
+  polarization = y
+  duration     = 10 fs
+  waist        = 4 um
+  # injection = antenna      # the lab-fixed antenna at z = 0 instead of the boosted entrance plane (decision 89)
+}
+
+window {
+  start    = 40 fs            # lab; boosted 149 fs
+  velocity = 1
+}
+
+species electrons {
+  charge    = -1
+  mass      = 1
+  density   = 0.01
+  zmin      = 13 um
+  ppc_r     = 2
+  ppc_theta = 8
+}
+
+species protons {
+  charge    = 1
+  mass      = 1836
+  density   = 0.01
+  zmin      = 13 um
+  ppc_r     = 2
+  ppc_theta = 8
+}
+
+output {
+  dir   = out_rz_lwfa_boost
+  every = 20
+}

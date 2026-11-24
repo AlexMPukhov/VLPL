@@ -1,0 +1,46 @@
+# The vacuum case of vacuum.deck (Fig. 4 of Pukhov 2020) in RZ (VLPL-RZ; VLPL-iRZ with numerics.solver = irip):
+# 10 GeV, eps_n = 1 nm, sigma = 1.41 um, 6 nC, dz = 0.1 um, dr = 0.15 um, 1 mm, modes 0 and 1.
+#   build/vlpl bench/emittance/rz_vacuum.deck
+grid {
+  geometry   = rz
+  modes      = 2
+  lambda0    = 1 um
+  nz         = 256             # 25.6 um
+  nr         = 64              # 9.6 um, conducting wall
+  dz         = 0.1 um
+  dr         = 0.15 um
+  boundary_z = open
+  t_end      = 3336 fs         # 1 mm
+}
+
+numerics {
+  solver = rip_cc
+  shape  = 2
+  pusher = boris
+}
+
+
+species beam {
+  charge  = -1
+  mass    = 1
+  density = 0.761              # 6 nC (0.0761: 0.6 nC)
+  uz      = 19570              # 10 GeV
+  uth_x   = 7.092e-4           # eps_n = 1 nm
+  uth_y   = 7.092e-4
+  ppc_z   = 2
+  ppc_r   = 2
+  ppc_theta = 8
+  density_function = gauss(z - 12.8 um, 1.41 um) * gauss(r, 1.41 um) * (abs(z - 12.8 um) < 5.64 um) * (r < 5.64 um)
+  self_field = true
+}
+
+diagnostic beam {
+  species   = beam
+  every     = 200
+  bins      = 0
+}
+
+output {
+  dir   = out_rz_vacuum
+  every = 200
+}

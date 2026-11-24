@@ -1,0 +1,45 @@
+# Boosted-frame drift box (irip paper, paragraph "Boosted-frame grids"): neutral electron-proton plasma streaming along -x
+# through a periodic 128 x 16 x 16 box, RIP-CC, shape 2, 12 particles per cell. The defaults are the gamma = 10 case
+# (lab lambda0 = 0.8 um at lambda/32, lab n0 = 1e-3 n_c, i.e. gamma n0 in the boosted frame); boost_nci/cases.txt sets
+# dx = gamma (1 + beta) lambda0 / 32, dy = dz = 1.63 dx (stability number 0.75), density, ux and the filter per case.
+grid {
+  lambda0    = 0.8 um
+  nx         = 128
+  ny         = 16
+  nz         = 16
+  dx         = 0.498747 um
+  dy         = 0.814450 um
+  dz         = 0.814450 um
+  boundary_x = periodic
+  t_end      = 12000 fs
+}
+numerics {
+  solver = rip_cc
+  shape  = 2
+  pusher = higuera_cary
+}
+species electrons {
+  charge  = -1
+  mass    = 1
+  density = 1.0e-2
+  ppc_x   = 3
+  ppc_y   = 2
+  ppc_z   = 2
+  ux      = -9.949874
+  uth_x   = 6e-3
+  uth_y   = 1e-3
+  uth_z   = 1e-3
+}
+species protons {
+  charge  = 1
+  mass    = 1836
+  density = 1.0e-2
+  ppc_x   = 3
+  ppc_y   = 2
+  ppc_z   = 2
+  ux      = -9.949874
+}
+output {
+  dir   = out
+  every = 50
+}
