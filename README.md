@@ -783,7 +783,8 @@ code or a stored benchmark curve with a tolerance).
 - **Design notes**: one specification per module in `docs/specs/` (equations, discretisation, tests) and the reasons
   behind the conventions in `docs/decisions.md`.
 
-The method papers: A. Pukhov, J. Comput. Phys. 418, 109622 (2020) (RIP); A. Pukhov, T. C. Wilson, the iRIP paper (in
+Cite the software as A. Pukhov, VLPL, Zenodo, doi:10.5281/zenodo.24503313 (all versions; v1.0.0: doi:10.5281/zenodo.24503314),
+see CITATION.cff. The method papers: A. Pukhov, J. Comput. Phys. 418, 109622 (2020) (RIP); A. Pukhov, T. C. Wilson, the iRIP paper (in
 preparation), whose verification scripts, decks and figure scripts are in `bench/irip_paper/`.
 
 ## Known limitations and next steps
