@@ -130,6 +130,18 @@ void Comm::allgather(const double* send, int n, double* recv) {
 #endif
 }
 
+void Comm::allgather_x(const double* send, int n, double* recv) {
+#ifdef RIP_MPI
+    if (row_x_ == MPI_COMM_NULL) {
+        int keep[3] = {1, 0, 0};
+        MPI_Cart_sub(cart_, keep, &row_x_);           // the ranks of this row, ranked by coords[0]
+    }
+    MPI_Allgather(send, n, MPI_DOUBLE, recv, n, MPI_DOUBLE, row_x_);
+#else
+    for (int q = 0; q < n; ++q) recv[q] = send[q];
+#endif
+}
+
 void Comm::bcast(std::string& s) {
 #ifdef RIP_MPI
     unsigned long n = s.size();

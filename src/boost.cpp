@@ -61,7 +61,7 @@ void apply_boost(Config& c) {
     if (!c.file_lasers.empty() && !c.window.enabled)   // the antenna leaves the box when the window starts (decision 97)
         throw std::runtime_error(g + "laser files need a moving window (the antenna emits them at the lab plane x = 0 until it starts)");
     if (c.mover_implicit) throw std::runtime_error(g + "numerics.mover = explicit only so far");
-    if (c.rings.on || c.metal_rz.on || !c.dielectrics.empty() || c.plane_z >= 0)
+    if (c.rings.on || c.metal_rz.on || !c.dielectrics.empty() || !c.dielectrics3.empty() || c.plane_z >= 0)
         throw std::runtime_error(g + "no rings, metal or dielectric blocks or output.plane_z (lab objects) yet");
     B.beta = std::sqrt(1 - 1 / (B.gamma * B.gamma));
     const double s = B.stretch();

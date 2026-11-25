@@ -22,6 +22,29 @@ RIP-CC (`FieldsRZ::pass`, docs/specs/rz_modes.md): E_z, E_phi, B_r at (i, r_j); 
   is the tridiagonal line along z
     y_a (1 + chi_a (m_a + m_{a+1}) / 4) + chi_a / 4 (m_a y_{a-1} + m_{a+1} y_{a+1}) = chi_a / 2 (m_a dEv_a + m_{a+1} dEv_{a+1}),
   diagonally dominant; chi_a = 0 gives y_a = 0.
+- With the block metal (conductors that depend on phi, docs/specs/rz_metal_phi.md, decision 103) the masks m depend on the
+  angle, which the per-mode lines cannot hold. Then the lines are solved on the 2M - 1 collocation angles (Alexander,
+  2026-11-24): E_r and its transported value at phi_k, E_phi at its own angles (the staggered phi_k + dphi / 2 with
+  phi_derivative = difference); per (row, angle, component) the same line with the masks Mh (E_r) and Mp (E_phi, and the
+  axis) of that angle; the corrections of E and B per angle with the face rules rBp, rBr (B from the vacuum side at a z face,
+  nothing where B is held at 0); then back to the modes. The modes and the values on these angles are a bijection (1 +
+  2(M - 1) real numbers each, Parseval), so nothing is projected: each angle is the line of decision 100, and stability and
+  the energy follow per angle. An axisymmetric metal function (spectral) gives the rings result to round-off (test P6). The
+  window entry (E_z of the entering columns from div D) applies the E_z rule of each angle column by column.
+- eps from a deck expression (Alexander, 2026-11-24, Q2 (a)): chi of each component over its control volume from 8 x 8
+  sub-samples of the function (inside the block's bounding box), with the same rule as the rectangles' cut cells: harmonic
+  along the component's own direction (E_r across r with weight 1/r, E_z along z), arithmetic (r-weighted) across. Exact
+  for interfaces along r or z, better than a staircase for tilted or curved ones, not second order there (the full
+  anisotropic tensor would couple E_z with E_r). The function is evaluated on the device (the compiled program of the
+  expression); a window shift moves chi by one column and samples only the edge columns. eps < 1 anywhere is an error.
+- eps depending on the azimuth (the expression uses x, y or phi): chi is kept on the 2M - 1 collocation angles (E_z, E_r at
+  phi_k, E_phi at its own angles, staggered with the metal block's phi_derivative = difference), each angle's control volume
+  [phi -+ dphi / 2] sampled 8 x 8 x 4 (E_phi harmonic over phi, E_z, E_r arithmetic over it). Then every operation with chi
+  goes through the angles (a bijection with the modes): the E_z increments of predictor and corrector are divided per angle
+  (`rz_diel_ez_angles`), the lines are solved per angle (also without metal), the energy E.P / 2, the mode energies E_m . P_m
+  and div D take D = (1 + chi) E on the angles back to the modes, the window entry likewise. The modes couple through chi
+  (P = chi E is the collocation product); stability and losslessness hold per angle. Axisymmetric eps keeps the per-mode
+  path (bit-identical).
 - Step: predictor (1 + chi_z) -> vacuum transport (unchanged) -> exchange -> line solves and the corrections of the owned
   transverse fields (metal z faces: B from the characteristic of the vacuum side including y) -> exchange -> corrector
   (1 + chi_z). Without dielectric blocks nothing changes (bit-identical).
@@ -59,8 +82,11 @@ dielectric [<name>] {   # several blocks; RZ, numerics.solver = rip_cc
   r_out   = 1 mm       # outer radius (beyond the wall: up to the wall)
   z_start = 6 mm       # lab frame
   z_end   = 106 mm
-  eps     = 2.1        # >= 1
-  ramp    = 0 um       # > 0: linear z ends of this length centred on z_start, z_end
+  eps     = 2.1        # >= 1; or an expression of x, y, z, r, phi (lab frame, units allowed), e.g.
+                       #   eps = 1 + 1.5 * (1 - (r / 0.5 mm)^2)    (a graded-index rod)
+                       #   eps = x < 0 ? 2.1 : 1                    (a half-filled pipe: chi per angle)
+                       # then r_in, r_out, z_start, z_end are an optional bounding box (default: everywhere)
+  ramp    = 0 um       # > 0: linear z ends of this length centred on z_start, z_end (constant eps only)
   enabled = true
 }
 ```
@@ -76,13 +102,31 @@ dr is one cell of metal (a perfect conductor: its thickness does not matter once
   - D2 TM01 in a filled tube: w sqrt(eps) / w(vacuum, same grid) - 1 against the scheme's dispersion relation
     (vonneumann.py tm01): eps 1.1 / 2.25 / 4 at k_z dz = 0.098 and 0.393, within 0.5 % of the predicted 5.9e-5 ... 9.6e-3.
   - D3 a block with eps = 1: fields bit for bit equal.
-  - D4 hot plasma with rings, filled gaps, a collar and a rod crossing a ring face (deck path, shapes 1, 2): div D - rho and
-    div B off the metal at round-off (6e-16); iRIP rejected.
+  - D4 hot plasma with dielectric over the ring region, a collar and a rod (deck path, shapes 1, 2) with (a) rings, (b) no
+    metal, (c) the block metal (four ridges depending on phi with z faces): div D - rho and div B off the metal at round-off
+    (6e-16 ... 1.2e-15); iRIP rejected.
   - D5 moving window, eps 3.8 lining, a bunch: Gauss 6.8e-13 of max rho, no growth (without the front layer and entry: 0.29
     and +17 % energy).
   - D6 the front-layer warning: a bunch loaded in the layer is warned at the start; a bunch at c catching up with a window at
     0.9 c is warned once when it enters (rate-limited); D5 raises none.
-  - tests/mpi.sh: rings + gaps + collar in a moving window and two blocks in a periodic column (cyclic), 1 vs NP ranks.
+  - D7 eps from a function equal to the rectangles of D1 (indicators, one across the periodic seam) = the rectangle blocks:
+    chi to 9e-16, fields after 300 steps to 4.5e-15.
+  - D8 graded-index tube eps(r) = 1 + 1.5 (1 - r^2 / R^2): TM01 against the radial ODE shot with RK4
+    (research/rz_dielectric/grin_tm01.py, w = 2.155441729447): 7.9e-5 at dr = 0.05, 2.0e-5 at dr = 0.025 (second order).
+  - D9 moving window: the D5 lining as a function of (z, r) = the rectangle block (energies to 4e-16, Gauss 7e-13).
+  - D10 eps per angle (the graded rod written in x, y) = the same eps per (r, z): fields 5.9e-15, W and W_1 equal, div D 2e-14.
+  - D11 a round pipe half filled with eps 2.1 (x < 0), k_z = 0: the lowest TM cutoff against polar finite differences
+    (research/rz_dielectric/xsection_eps.py, Richardson over three grids, second order: 1.88013382): 8 modes +4.5e-4,
+    16 modes -5.9e-7.
+- With the block metal (tests/test_rz_metal_phi.cpp):
+  - P6 an axisymmetric metal function (spectral) + three blocks = the rings + the same blocks (lines on the angles vs on the
+    modes), random fields, modes 0..2, 300 steps: 3.9e-15 of max.
+  - P7 the square guide (|x|, |y| < 0.6 in R = 1, 8 modes) filled with eps 2.1 / 3.8: at k_z = 0 every E update is divided by
+    eps, so sqrt(eps) k_c = the vacuum k_c of the same grid (TM11, TE10): 3e-9.
+  - P8 the corrugated square pipe of P4 (modes 0..6) with a lining crossing teeth and square, a rod and a block beyond the
+    metal, random fields, 3000 steps: W / W0 in [0.92, 1.00], div D and div B off the metal unchanged to 7e-15.
+  - tests/mpi.sh: rings + gaps + collar in a moving window, two blocks in a periodic column (cyclic), and the square
+    corrugated pipe with a lining across its walls in a moving window (lines on the angles), 1 vs NP ranks.
 - Benchmarks (bench/rz_dielectric/README.md): the DWA wake against the modal theory of the lined tube (eps 3.8, 2.1); the
   Cherenkov cone; thin-wall convergence (5 / 10 / 20 cells).
 

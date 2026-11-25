@@ -72,6 +72,9 @@ public:
     bool o5 = false;                 // numerics.closure = o5: the dispersion-corrected closure of iRIP (decision 72)
     class Medium* medium = nullptr;  // O7: linear-response media in iRIP (medium.hpp, decision 84); null: none
     class Metal3* metal = nullptr;   // embedded perfect conductor (block metal, metal3d.hpp, decision 102); null: none
+    class Dielectric3* diel = nullptr;   // dielectric blocks (dielectric3d.hpp, decision 100); null: none
+    int dfront = 0;                  // dielectric + moving window: the front absorbing layer (cells at the right x edge, decision 100)
+    double dfront_kappa = 0;
     // the solver step without the x layers (public: nvcc refuses device lambdas in private member functions)
     void step_core(Comm& comm, const BoundaryHooks& hooks, double t);
     // the local cells of the Gauss and div B checks (without the CPML and x layers, and one cell more); public for the

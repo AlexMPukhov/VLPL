@@ -158,15 +158,22 @@ void diel_identity(Comm& comm) {
     check("rz dielectric D3: a block with eps = 1 leaves the fields bit for bit unchanged (300 steps)", diff == 0, fmt("max difference %.1e", diff));
 }
 
-// D4. Deck path: hot plasma in a periodic tube with rings, the gaps filled (eps 1.5), a collar outside (eps 2.2) and a block
-//     crossing a ring face (modes 2, shape 1 and 2): the Gauss law div D = rho off the metal surface and div B at round-off.
-void diel_plasma(Comm& comm) {
+// D4. Deck path: hot plasma in a periodic tube with dielectric blocks (eps 1.5 over the ring region, a collar outside, eps 2.2,
+//     and a rod, eps 1.3; modes 2, shape 1 and 2), the Gauss law div D = rho off the metal surface and div B at round-off, with
+//     (a) rings (the gaps filled), (b) no metal, (c) the block metal: four ridges depending on phi with z faces (the lines on
+//     the angles).
+void diel_plasma(Comm& comm, int variant) {
     const char* path = "rz_diel_test_tmp.deck";
+    const char* metal[3] = {"rings {\n r_in = 0.48 um\n r_out = 0.9 um\n period = 1 um\n gap = 0.5 um\n z_start = 0.3 um\n z_end = 1.9 um\n}\n",
+                            "",
+                            "metal {\n function = r > 0.48 um && r < 0.9 um && abs(phi - pi/2 * floor((phi + pi/4) / (pi/2))) < 0.5 && "
+                            "(z - 1 um * floor(z / (1 um))) < 0.5 um\n}\n"};
+    const char* name[3] = {"rings", "no metal", "metal ridges (phi)"};
     if (comm.rank == 0) {
         std::ofstream f(path);
         f << "grid {\n geometry = rz\n modes = 2\n lambda0 = 1 um\n nz = 50\n nr = 24\n dz = 0.04 um\n dr = 0.06 um\n"
              " t_end = 30 fs\n}\nnumerics {\n solver = rip_cc\n pusher = boris\n}\n"
-             "rings {\n r_in = 0.48 um\n r_out = 0.9 um\n period = 1 um\n gap = 0.5 um\n z_start = 0.3 um\n z_end = 1.9 um\n}\n"
+          << metal[variant] <<
              "dielectric gaps {\n r_in = 0.48 um\n r_out = 0.9 um\n z_start = 0.3 um\n z_end = 1.9 um\n eps = 1.5\n}\n"
              "dielectric collar {\n r_in = 0.9 um\n r_out = 1.05 um\n z_start = 0.1 um\n z_end = 1.7 um\n eps = 2.2\n}\n"
              "dielectric rod {\n r_in = 0.1 um\n r_out = 0.31 um\n z_start = 1.13 um\n z_end = 1.62 um\n eps = 1.3\n}\n"
@@ -188,15 +195,17 @@ void diel_plasma(Comm& comm) {
         while (!sim.finished()) sim.step();
         double wf, g, rmax, db;
         sim.rz_diagnostics(wf, g, rmax, db);
-        check("rz dielectric D4: plasma, rings, filled gaps, collar, rod (shape " + std::to_string(order) +
-                  "): div D - rho and div B off the metal at round-off",
+        check(std::string("rz dielectric D4: plasma, ") + name[variant] + ", dielectric over the rings region, collar, rod (shape " +
+                  std::to_string(order) + "): div D - rho and div B off the metal at round-off",
               g < 1e-12 * std::max(rmax, 1e-30) + 1e-14 && db < 1e-12 && std::isfinite(wf),
               fmt("Gauss %.1e", g) + fmt(" (max rho %.1e)", rmax) + fmt(", div B %.1e", db) + fmt(", W %.3e", wf));
     }
-    bool rejected = false;
-    dk.override_from("numerics.solver=irip");
-    try { Config::from_deck(dk); } catch (const std::exception& e) { rejected = std::string(e.what()).find("rip_cc") != std::string::npos; }
-    check("rz dielectric: dielectric blocks with iRIP rejected", rejected, "");
+    if (variant == 0) {
+        bool rejected = false;
+        dk.override_from("numerics.solver=irip");
+        try { Config::from_deck(dk); } catch (const std::exception& e) { rejected = std::string(e.what()).find("rip_cc") != std::string::npos; }
+        check("rz dielectric: dielectric blocks with iRIP rejected", rejected, "");
+    }
     comm.barrier();
     if (comm.rank == 0) std::remove(path);
 }
@@ -277,6 +286,241 @@ void diel_window_warning(Comm& comm) {
               fmt("; window at 0.9 c: %.0f at the start, ", double(b.first)) + fmt("%.0f after 750 steps", double(b.second)));
 }
 
+// eps as a deck expression of (x, y, z, r, phi) (code units, no unit names); phi: the caller sets c.phi
+DielectricConfig fblock(const std::string& text) {
+    DielectricConfig c;
+    c.fn = Expr(text, {"x", "y", "z", "r", "phi"}, [](const std::string&, double&) { return false; });
+    c.r_in = 0; c.r_out = 1e300; c.z_start = -1e300; c.z_end = 1e300;
+    return c;
+}
+
+// D7. eps from a function that is the rectangles of D1 (indicator functions) = the rectangle blocks: chi of every point and
+//     the fields after 300 steps (modes 2, periodic, one block across the seam) equal to round-off. The function is sampled
+//     8 x 8 everywhere, the rectangle exactly outside its cut cells and at the same sub-points inside them.
+void diel_function_rect(Comm& comm) {
+    const int nz = 40, nr = 22, M = 2;
+    const double dr = 0.1, dz = 0.07, R = nr * dr, kz = 2 * M_PI / (nz * dz), Lz = nz * dz;
+    Domain d = rz_domain(comm, nz, nr, M, dz, dr, true, Solver::RipCC);
+    FieldsRZ a(d, M), b(d, M);
+    a.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{block(0.37, 1.13, 0.33, 1.47, 1.7),
+                                                                         block(0.0, 2.6, 2.31, 3.17, 3.0)}, d, a.grid());
+    // the second block crosses the seam z = Lz: its periodic image [2.31 - Lz, 3.17 - Lz) inside [0, Lz)
+    char t[400];
+    std::snprintf(t, sizeof t, "1 + 0.7 * (r >= 0.37 && r < 1.13 && z >= 0.33 && z < 1.47) + 2 * (r < 2.6 && (z >= 2.31 || z < %.17g))", 3.17 - Lz);
+    b.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{fblock(t)}, d, b.grid());
+    double dchi = 0;
+    for (int c = 0; c < 3; ++c) {
+        const std::vector<double> x = a.diel->chi_host(c), y = b.diel->chi_host(c);
+        for (size_t q = 0; q < x.size(); ++q) dchi = std::max(dchi, std::abs(x[q] - y[q]));
+    }
+    for (FieldsRZ* f : {&a, &b}) { init_mix(*f, R, kz); comm.exchange(d, all(*f)); }
+    for (int n = 0; n < 300; ++n) { a.zero_currents(); a.step(comm); b.zero_currents(); b.step(comm); }
+    double diff = 0, sc = 0;
+    Field* fa[6] = {&a.ez, &a.er, &a.ep, &a.bz, &a.br, &a.bp};
+    Field* fb[6] = {&b.ez, &b.er, &b.ep, &b.bz, &b.br, &b.bp};
+    for (int c = 0; c < 6; ++c) diff = std::max(diff, max_abs_diff(*fa[c], *fb[c], &sc));
+    diff = comm.allreduce_max(diff) / comm.allreduce_max(sc);
+    dchi = comm.allreduce_max(dchi);
+    check("rz dielectric D7: eps from a function (the indicator of the rectangles) = the rectangle blocks (chi, fields after 300 steps)",
+          dchi < 1e-14 && diff < 1e-12, fmt("max chi difference %.1e", dchi) + fmt(", fields %.1e of max", diff));
+}
+
+// Frequency w dt of the dominant line of s_n: maximum of the Hann-windowed DTFT (scan, then golden section)
+double peak(const std::vector<double>& s, double wlo, double whi) {
+    const size_t N = s.size();
+    auto amp = [&](double w) {
+        double re = 0, im = 0;
+        for (size_t n = 0; n < N; ++n) {
+            const double h = s[n] * (0.5 - 0.5 * std::cos(2 * M_PI * n / (N - 1)));
+            re += h * std::cos(w * double(n)); im -= h * std::sin(w * double(n));
+        }
+        return std::hypot(re, im);
+    };
+    double best = wlo, bv = -1;
+    const int K = 2000;
+    for (int q = 0; q <= K; ++q) {
+        const double w = wlo + (whi - wlo) * q / K, v = amp(w);
+        if (v > bv) { bv = v; best = w; }
+    }
+    double lo = best - (whi - wlo) / K, hi = best + (whi - wlo) / K;
+    const double g = (std::sqrt(5.0) - 1) / 2;
+    for (int it = 0; it < 80; ++it) {
+        const double x1 = hi - g * (hi - lo), x2 = lo + g * (hi - lo);
+        if (amp(x1) > amp(x2)) hi = x2; else lo = x1;
+    }
+    return 0.5 * (lo + hi);
+}
+
+// TM01 of a tube R = nr dr filled with the graded eps(r) = 1 + 1.5 (1 - (r/R)^2) (a function block), periodic z (k_z = 2 pi / Lz):
+// w from the DTFT peak of E_z projected on its start
+double grin_tm01(Comm& comm, int nz, int nr, double dr, double dz) {
+    const double R = nr * dr, kz = 2 * M_PI / (nz * dz);
+    Domain d = rz_domain(comm, nz, nr, 1, dz, dr, true, Solver::RipCC);
+    FieldsRZ f(d, 1);
+    char t[200];
+    std::snprintf(t, sizeof t, "1 + 1.5 * (1 - (r / %.17g)^2)", R);
+    f.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{fblock(t)}, d, f.grid());
+    {
+        H ez(f.ez), er(f.er);
+        const RadialGrid& g = f.grid();
+        const double kp = j01 / R;
+        for (int i = 0; i < d.n[0]; ++i) {
+            const double z = (d.off[0] + i) * dz;
+            for (int j = 0; j < nr; ++j) {
+                ez(i, j, 0) = std::cyl_bessel_j(0, kp * g.r[size_t(j)]) * std::cos(kz * z);
+                er(i, j, 0) = kz / kp * std::cyl_bessel_j(1, kp * g.rh[size_t(j)]) * std::sin(kz * z);
+            }
+        }
+        ez.put(f.ez); er.put(f.er);
+    }
+    comm.exchange(d, all(f));
+    const std::vector<double> h0 = f.ez.host();
+    std::vector<double> s;
+    const int steps = int(60 * 2 * M_PI / (2.0 * dz));
+    for (int n = 0; n < steps; ++n) {
+        const std::vector<double> x = f.ez.host();
+        double v = 0;
+        for (int i = 0; i < d.n[0]; ++i)
+            for (int j = 0; j < nr; ++j) v += (j + 0.5) * x[f.ez.idx(i, j, 0)] * h0[f.ez.idx(i, j, 0)];
+        comm.allreduce_sum(&v, 1);
+        s.push_back(v);
+        f.zero_currents(); f.step(comm);
+    }
+    return peak(s, 1.0 * dz, 4.0 * dz) / dz;
+}
+
+// D8. Graded-index tube (eps from a function of r): TM01 against the continuum (research/rz_dielectric/grin_tm01.py, the radial
+//     ODE shot with RK4: w = 2.155441729447 at k_z = 2 pi / 2.56, R = 1.6): second-order convergence (dr, dz halved).
+void diel_grin(Comm& comm) {
+    const double wref = 2.155441729447;
+    const double w1 = grin_tm01(comm, 64, 32, 0.05, 0.04), w2 = grin_tm01(comm, 128, 64, 0.025, 0.02);
+    const double e1 = w1 / wref - 1, e2 = w2 / wref - 1;
+    check("rz dielectric D8: graded eps(r) = 1 + 1.5 (1 - r^2/R^2) as a function: TM01 against the radial ODE, second order",
+          std::abs(e2) < 5e-4 && std::abs(e1 / e2) > 3 && std::abs(e1 / e2) < 5.5,
+          fmt("w/w_ref - 1 = %.2e (dr 0.05)", e1) + fmt(", %.2e (dr 0.025)", e2) + fmt(", ratio %.2f", e1 / e2));
+}
+
+// D9. Moving window: the lining of D5 as a function of (z, r) (sampled only in the columns a shift brings in) = the rectangle
+//     block: the diagnostics (energies, Gauss law) of 1500 steps equal to round-off.
+void diel_function_window(Comm& comm) {
+    const char* path = "rz_diel_fwin_tmp.deck";
+    auto run = [&](const std::string& lining) {
+        if (comm.rank == 0) {
+            std::ofstream f(path);
+            f << "grid {\n geometry = rz\n modes = 1\n lambda0 = 100 um\n nz = 600\n nr = 40\n dz = 0.4 um\n dr = 0.5 um\n"
+                 " boundary_z = open\n t_end = 2 ps\n}\nnumerics {\n solver = rip_cc\n pusher = boris\n}\n"
+                 "window {\n start = 0 fs\n velocity = 1\n}\n" << lining <<
+                 "species bunch {\n charge = 1\n mass = 18361526.7\n density = 1\n density_function = gauss(z - 0.12 mm, 8 um) * gauss(r, 3 um)\n"
+                 " zmin = 0.09 mm\n zmax = 0.15 mm\n rmax = 10 um\n uz = 999.9995\n self_field = true\n ppc_z = 1\n ppc_r = 2\n ppc_theta = 1\n}\n"
+                 "output {\n dir = rz_diel_fwin_out\n every = 100000\n}\n";
+        }
+        comm.barrier();
+        Deck dk = Deck::read(path);
+        Config c = Config::from_deck(dk);
+        Simulation sim(c, comm);
+        sim.init();
+        std::vector<double> out;
+        long n = 0;
+        while (!sim.finished()) {
+            sim.step();
+            if (++n % 250 == 0) {
+                double wf, g, rm, db;
+                sim.rz_diagnostics(wf, g, rm, db);
+                comm.allreduce_sum(&wf, 1);
+                out.insert(out.end(), {wf, g / rm});
+            }
+        }
+        comm.barrier();
+        if (comm.rank == 0) std::remove(path);
+        return out;
+    };
+    const auto a = run("dielectric layer {\n r_in = 12 um\n r_out = 30 um\n z_start = 0.2 mm\n z_end = 10 mm\n eps = 3.8\n}\n");
+    const auto b = run("dielectric layer {\n eps = 1 + 2.8 * (r >= 12 um && r < 30 um && z >= 0.2 mm && z < 10 mm)\n}\n");
+    double dw = 0, gm = 0;
+    for (size_t q = 0; q + 1 < a.size(); q += 2) { dw = std::max(dw, std::abs(a[q] / b[q] - 1)); gm = std::max(gm, b[q + 1]); }
+    check("rz dielectric D9: moving window, the lining as a function of (z, r) (filled column by column) = the rectangle block",
+          a.size() == b.size() && dw < 1e-12 && gm < 1e-11, fmt("max relative energy difference %.1e", dw) + fmt(", Gauss %.1e of max rho", gm));
+}
+// D10. chi per angle = chi per (r, z) for an axisymmetric eps written in x, y (the graded rod of D8 as 1 + 1.5 (1 - (x^2 + y^2)
+//      / R^2): eps per angle, E_z divided, the lines solved, the energy and div D taken on the 3 angles of 2 modes) against the
+//      same eps as a function of r (per mode): fields after 300 steps, the energy, W of mode 1 and div D to round-off.
+void diel_phi_axisym(Comm& comm) {
+    const int nz = 40, nr = 22, M = 2;
+    const double dr = 0.1, dz = 0.07, R = nr * dr, kz = 2 * M_PI / (nz * dz);
+    Domain d = rz_domain(comm, nz, nr, M, dz, dr, true, Solver::RipCC);
+    FieldsRZ a(d, M), b(d, M);
+    char t[200];
+    std::snprintf(t, sizeof t, "1 + 1.5 * (1 - (r / %.17g)^2)", R);
+    a.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{fblock(t)}, d, a.grid());
+    std::snprintf(t, sizeof t, "1 + 1.5 * (1 - (x^2 + y^2) / %.17g)", R * R);
+    DielectricConfig c = fblock(t);
+    c.phi = true;
+    b.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{c}, d, b.grid());
+    b.diel->set_angles(d, b.grid(), M, false);
+    for (FieldsRZ* f : {&a, &b}) { init_mix(*f, R, kz); comm.exchange(d, all(*f)); }
+    for (int n = 0; n < 300; ++n) { a.zero_currents(); a.step(comm); b.zero_currents(); b.step(comm); }
+    double diff = 0, sc = 0;
+    Field* fa[6] = {&a.ez, &a.er, &a.ep, &a.bz, &a.br, &a.bp};
+    Field* fb[6] = {&b.ez, &b.er, &b.ep, &b.bz, &b.br, &b.bp};
+    for (int q = 0; q < 6; ++q) diff = std::max(diff, max_abs_diff(*fa[q], *fb[q], &sc));
+    diff = comm.allreduce_max(diff) / comm.allreduce_max(sc);
+    double wa = a.energy(), wb = b.energy(), ma = a.energy_mode(1), mb = b.energy_mode(1);
+    comm.allreduce_sum(&wa, 1); comm.allreduce_sum(&wb, 1); comm.allreduce_sum(&ma, 1); comm.allreduce_sum(&mb, 1);
+    Field ga(d), gb(d);
+    a.div_e(ga); b.div_e(gb);
+    double gs = 0;
+    const double dg = comm.allreduce_max(max_abs_diff(ga, gb, &gs)) / comm.allreduce_max(gs);
+    check("rz dielectric D10: eps per angle (written in x, y) = the same eps per (r, z): fields, W, W_1, div D (300 steps, 2 modes)",
+          b.diel->angular() && diff < 1e-12 && std::abs(wb / wa - 1) < 1e-12 && std::abs(mb / ma - 1) < 1e-12 && dg < 1e-12,
+          fmt("fields %.1e of max", diff) + fmt(", W %.1e", wb / wa - 1) + fmt(", W_1 %.1e", mb / ma - 1) + fmt(", div D %.1e", dg));
+}
+
+// lowest TM cutoff (k_z = 0) of the pipe R = 1 (nr = 40) half filled with eps = 2.1 (x < 0), M modes: w from the DTFT peak of
+// E_z projected on its start, sin(w dt / 2) = dt k / 2
+double half_pipe(Comm& comm, int M) {
+    const int nr = 40;
+    const double dr = 1.0 / nr;
+    const RadialGrid rg = rz_radial_grid(nr, dr);
+    const double dz = 0.95 * 2 / std::sqrt(rz_lambda_max(rg, M));
+    Domain d = rz_domain(comm, 4, nr, M, dz, dr, true, Solver::RipCC);
+    FieldsRZ f(d, M);
+    DielectricConfig c = fblock("x < 0 ? 2.1 : 1");
+    c.phi = true;
+    f.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{c}, d, f.grid());
+    f.diel->set_angles(d, f.grid(), M, false);
+    {
+        H ez(f.ez);
+        for (int i = 0; i < d.n[0]; ++i)
+            for (int j = 0; j < nr; ++j) ez(i, j, 0) = std::cyl_bessel_j(0, j01 * f.grid().r[size_t(j)]);
+        ez.put(f.ez);
+    }
+    comm.exchange(d, all(f));
+    const std::vector<double> h0 = f.ez.host();
+    std::vector<double> s;
+    const int steps = int(40 * 2 * M_PI / (1.88 * dz));
+    for (int n = 0; n < steps; ++n) {
+        const std::vector<double> x = f.ez.host();
+        double v = 0;
+        for (int j = 0; j < nr; ++j)
+            for (int q = 0; q < 2 * M - 1; ++q) v += (q ? 2 : 1) * (j + 0.5) * x[f.ez.idx(0, j, q)] * h0[f.ez.idx(0, j, q)];
+        s.push_back(comm.allreduce_max(v));
+        f.zero_currents(); f.step(comm);
+    }
+    const double w = peak(s, 1.5 * dz, 2.4 * dz);
+    return 2 / dz * std::sin(w / 2);
+}
+
+// D11. A round pipe half filled with a dielectric slab (eps 2.1 for x < 0, R = 1, nr = 40; eps depends on phi): the lowest TM
+//      cutoff against the continuum of research/rz_dielectric/xsection_eps.py (polar finite differences, Richardson over three
+//      grids, second order: 1.88013382), for 8 and 16 modes.
+void diel_half_pipe(Comm& comm) {
+    const double ref = 1.88013382;
+    const double k8 = half_pipe(comm, 8), k16 = half_pipe(comm, 16);
+    const double e8 = k8 / ref - 1, e16 = k16 / ref - 1;
+    check("rz dielectric D11: pipe half filled with eps 2.1 (eps depending on phi): lowest TM cutoff against polar finite differences",
+          std::abs(e16) < 5e-3 && std::abs(e16) <= std::abs(e8) * 1.05,
+          fmt("8 modes %.6f", k8) + fmt(" (%+.2e)", e8) + fmt(", 16 modes %.6f", k16) + fmt(" (%+.2e); reference 1.88013382", e16));
+}
 }  // namespace
 
 void test_rz_dielectric(Comm& comm) {
@@ -285,5 +529,10 @@ void test_rz_dielectric(Comm& comm) {
     diel_identity(comm);
     diel_gauss_energy(comm);
     diel_tm01(comm);
-    diel_plasma(comm);
+    for (int v = 0; v < 3; ++v) diel_plasma(comm, v);
+    diel_function_rect(comm);
+    diel_grin(comm);
+    diel_function_window(comm);
+    diel_phi_axisym(comm);
+    if (comm.size == 1) diel_half_pipe(comm);
 }

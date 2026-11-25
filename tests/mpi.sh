@@ -522,6 +522,16 @@ for np in 1 $NP; do
         output.every=50 output.dir=mpi_sqpipe_$np > /dev/null
 done
 compare mpi_sqpipe_1/diag.txt mpi_sqpipe_$NP/diag.txt " (RZ metal depending on phi, square pipe, self-field, window, $NP ranks along z)" 1e-8
+# the same with a dielectric lining across the corrugated square walls (decision 100 with the block metal: the lines on the
+# angles, partitioned along z; the entering columns with the metal of each angle), the bunch behind the 32-cell front layer
+for np in 1 $NP; do
+    $MPIRUN -np $np $EXE examples/rz_square_pipe.deck grid.modes=5 grid.nz=160 grid.nr=60 grid.dr=50um grid.dz=35um \
+        grid.r_absorber_cells=8 grid.t_end=20ps "species bunch.density_function=gauss(z - 3 mm, 100 um) * gauss(sqrt((x - 100 um)^2 + y^2), 50 um)" \
+        "species bunch.zmin=2.5mm" "species bunch.zmax=3.5mm" "species bunch.rmax=0.4mm" "species bunch.ppc_theta=18" \
+        "dielectric lining.r_in=0.7mm" "dielectric lining.r_out=1.6mm" "dielectric lining.z_start=5.8mm" "dielectric lining.z_end=100mm" \
+        "dielectric lining.eps=2.1" output.openpmd_every=0 output.axis_every=0 output.every=50 output.dir=mpi_sqdiel_$np > /dev/null
+done
+compare mpi_sqdiel_1/diag.txt mpi_sqdiel_$NP/diag.txt " (RZ metal depending on phi + dielectric lining, window, $NP ranks along z: lines on the angles)" 1e-8
 if [ -n "$CK" ]; then
     for np in $NP 3; do
         rm -rf mpi_rzrestart_$np; mkdir -p mpi_rzrestart_$np/checkpoints
@@ -1026,6 +1036,15 @@ compare mpi_struct_1/diag.txt mpi_struct_$NP/diag.txt " (structure: metal enteri
 wcompare mpi_struct_1/wake_offset.txt mpi_struct_$NP/wake_offset.txt " (structure: wake potential at the offset)"
 wcompare mpi_struct_1/side_flux.txt mpi_struct_$NP/side_flux.txt " (structure: side flux)"
 wcompare mpi_struct_1/slices_drive.txt mpi_struct_$NP/slices_drive.txt " (structure: beam slices)"
+# the same pipe with a dielectric liner across its corrugated wall (decision 100 in Cart3D, dielectric3d.hpp: the lines along x
+# partitioned over the row of ranks along x, the entry of the window from div D, the front layer), the beam behind the layer
+for np in 1 $NP; do
+    $MPIRUN -np $np $EXE examples/structure_pipe.deck grid.t_end=2.5ps "wake axis.every=25" "wake offset.every=25" \
+        "species drive.density_function=gauss(x - 0.3 mm, 40 um) * gauss(sqrt((y - 0.67 mm)^2 + (z - 0.64 mm)^2), 20 um) * (abs(x - 0.3 mm) < 160 um) * (sqrt((y - 0.67 mm)^2 + (z - 0.64 mm)^2) < 80 um)" \
+        "dielectric liner.eps=x > 1.0 mm && sqrt((y - 0.64 mm)^2 + (z - 0.64 mm)^2) > 0.25 mm && sqrt((y - 0.64 mm)^2 + (z - 0.64 mm)^2) < 0.55 mm ? 2.1 : 1" \
+        "beam_slices drive.every=25" output.dir=mpi_sdiel_$np > /dev/null
+done
+compare mpi_sdiel_1/diag.txt mpi_sdiel_$NP/diag.txt " (structure + dielectric liner, Cart3D window: lines along x over the ranks)" 1e-10
 # Structure runs in RZ (decision 105, docs/specs/structure3d.md section 5): an axisymmetric corrugated pipe (metal block,
 # spectral phi derivative) entering the moving window, an offset rigid bunch with its self-field (modes 0, 1), a witness
 # through two quadrupoles (one with its axis off r = 0), wake probes on the axis and off it, beam slices: diag.txt and

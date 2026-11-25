@@ -146,7 +146,8 @@ void FieldsRZ::pass(Comm& comm, bool predictor, Field& oEz, Field& oBz) {
     if (predictor) {
         par_for(cols, [=] HD(long q) {
             const int i = int(q % nz), j = int((q / nz) % nr), m = int(q / (long(nz) * nr));
-            const double fe = dv.on ? 0.5 * D / (1 + dv.z(i, j)) : 0.5 * D;   // (1 + chi) d_t E_z = curl B - J_z
+            // (1 + chi) d_t E_z = curl B - J_z (chi per angle: divided on the angles after this kernel)
+            const double fe = dv.on && !dv.np ? 0.5 * D / (1 + dv.z(i, j)) : 0.5 * D;
             Cx e = get(Ez, i, j, m) + fe * (op.psi_x(Bp, Br, i, j, m) - get(Jz, i, j, m));
             if (m >= 1 && j == 0) e = {0, 0};
             Cx b = get(Bz, i, j, m) + (0.5 * D) * op.phi_x(Ep, Er, i, j, m);
@@ -157,6 +158,7 @@ void FieldsRZ::pass(Comm& comm, bool predictor, Field& oEz, Field& oBz) {
             put(Exs, i, j, m, e);
             put(Bxs, i, j, m, b);
         });
+        if (dv.np) rz_diel_ez_angles(*this, exs_, ez, exs_);                // chi per angle: the E_z increment / (1 + chi_z)
         if (metal_phi) rz_metal_phi_apply(*metal_phi, *this, 0, exs_, bxs_);   // block metal: the rules per angle
         if (g_.jc(M_ - 1) >= 0) rz_axis_cut_apply(*this, 0, exs_, bxs_);          // numerics.rz_axis_cut
         comm.exchange(d, {&exs_, &bxs_});
@@ -212,16 +214,17 @@ void FieldsRZ::pass(Comm& comm, bool predictor, Field& oEz, Field& oBz) {
         if (j == 0) px = m == 0 ? Cx{g.rh[0] * avg(Bp, nBp, 0).re / g.A[0], 0.0} : Cx{0, 0};
         else px = (1 / g.A[j]) * (g.rh[j] * avg(Bp, nBp, j) - g.rh[j - 1] * avg(Bp, nBp, j - 1)) - imul(g.mf(m) / g.r[j], avg(Br, nBr, j));
         const Cx fx = (-1 / g.B[j]) * (g.r[j + 1] * avg(Ep, nEp, j + 1) - g.r[j] * avg(Ep, nEp, j)) + imul(g.mf(m) / g.rh[j], avg(Er, nEr, j));
-        Cx e = get(Ez, i, j, m) + (dv.on ? D / (1 + dv.z(i, j)) : D) * (px - get(Jz, i, j, m));
+        Cx e = get(Ez, i, j, m) + (dv.on && !dv.np ? D / (1 + dv.z(i, j)) : D) * (px - get(Jz, i, j, m));
         if (m >= 1 && j == 0) e = {0, 0};
         Cx b = get(Bz, i, j, m) + D * fx;
         if (mv.n) {                                             // metal: E_z = 0 where tangential or inside, B_z = 0 in and on it
             if (mv.node_at(c0 + i, j) == 1) e = {0, 0};
             if (mv.half_at(c0 + i, j)) b = {0, 0};
         }
-        put(oE, i, j, m, e);
+        put(dv.np ? Exs : oE, i, j, m, e);                      // chi per angle: the vacuum value into the scratch E_z*
         put(oB, i, j, m, b);
     });
+    if (dv.np) rz_diel_ez_angles(*this, oEz, ez, exs_);         // E_z = E_z^n + increment / (1 + chi_z) on the angles
     if (metal_phi) rz_metal_phi_apply(*metal_phi, *this, 2, oEz, oBz);
     if (g_.jc(M_ - 1) >= 0) rz_axis_cut_apply(*this, 2, oEz, oBz);
 }
@@ -264,12 +267,12 @@ double FieldsRZ::energy(int i0, int i1) const {
         const double vn = 2 * M_PI * rg.A[j], vh = 2 * M_PI * rg.B[j];
         auto sq = [&](const FV& v) { return v(i, j, k) * v(i, j, k); };
         const double w = wm * (vn * (sq(a) + sq(c) + sq(f)) + vh * (sq(b) + sq(e) + sq(g)));
-        if (!dv.on) return w;
+        if (!dv.on || dv.np) return w;
         // the dielectric: + E.P with P = chi E at the E_z nodes and the J_r, J_phi points a = i + 1/2 (mu_z E there)
         const double mr = 0.5 * (b(i, j, k) + b(i + 1, j, k)), mp = 0.5 * (c(i, j, k) + c(i + 1, j, k));
         return w + wm * (vn * (dv.z(i, j) * sq(a) + dv.p(i, j) * mp * mp) + vh * dv.r(i, j) * mr * mr);
     });
-    return 0.5 * s * dz;
+    return 0.5 * s * dz + (dv.np ? rz_diel_pol_energy(*this, i0, i1) : 0.0);   // chi per angle: E.P on the angles
 }
 
 double FieldsRZ::energy_mode(int m) const {
@@ -282,11 +285,11 @@ double FieldsRZ::energy_mode(int m) const {
         const int i = int(q % nz), j = int((q / nz) % nr), k = k0 + int(q / (long(nz) * nr));
         auto sq = [&](const FV& v) { return v(i, j, k) * v(i, j, k); };
         const double w = (m ? 2.0 : 1.0) * 2 * M_PI * (rg.A[j] * (sq(a) + sq(c) + sq(f)) + rg.B[j] * (sq(b) + sq(e) + sq(g)));
-        if (!dv.on) return w;
+        if (!dv.on || dv.np) return w;
         const double mr = 0.5 * (b(i, j, k) + b(i + 1, j, k)), mp = 0.5 * (c(i, j, k) + c(i + 1, j, k));
         return w + (m ? 2.0 : 1.0) * 2 * M_PI * (rg.A[j] * (dv.z(i, j) * sq(a) + dv.p(i, j) * mp * mp) + rg.B[j] * dv.r(i, j) * mr * mr);
     });
-    return 0.5 * s * d_.h[0];
+    return 0.5 * s * d_.h[0] + (dv.np ? rz_diel_pol_energy_mode(*this, m) : 0.0);   // chi per angle: E_m . P_m
 }
 
 void FieldsRZ::div_e(Field& out) const {
@@ -296,6 +299,7 @@ void FieldsRZ::div_e(Field& out) const {
     const Ops op{g_.view()};
     if (diel) diel->prepare(d_, g_);
     const DielView dv = diel ? diel->view() : DielView{};
+    if (dv.np) { rz_diel_div_d(*this, out); return; }   // chi per angle: D on the angles, back to the modes
     const RadialView g = g_.view();
     par_for(long(nz) * nr * M, [=] HD(long q) {
         const int i = int(q % nz), j = int((q / nz) % nr), m = int(q / (long(nz) * nr));

@@ -200,11 +200,11 @@ public:
     const char* name() const override { return "rz_front_layer_watch"; }
     Stage stage() const override { return Stage::Fields; }
     void setup(Simulation& s) override {
-        const int L = s.rz->zabs_hi;
+        const int L = s.cfg.rz ? s.rz->zabs_hi : s.fields->dfront;   // Cart3D / 2D: x is the window axis
         const double dz = s.dom.h[0], front = (s.dom.wx + s.dom.N[0]) * dz, zl = front - L * dz;
         entering_.assign(s.cfg.species.size(), false);
         in_.assign(s.cfg.species.size(), false);
-        last_.assign(s.cfg.species.size(), -1L << 40);
+        last_.assign(s.cfg.species.size(), -(1L << 40));
         for (size_t i = 0; i < s.cfg.species.size(); ++i) {
             const SpeciesConfig& c = s.cfg.species[i];
             if (c.q == 0 || c.photon || !(c.density > 0) || c.rmax[0] < zl) continue;
@@ -214,14 +214,14 @@ public:
                 std::fprintf(stderr, entering_[i]
                     ? "warning: species %s enters the window through its front edge: in the last %d cells (the absorbing layer of the "
                       "dielectric blocks, decision 100) its fields are damped; harmless for a neutral plasma at rest ahead of the beam\n"
-                    : "warning: species %s is loaded within the last %d cells of the window (z > %.6g): the front absorbing layer of the "
+                    : "warning: species %s is loaded within the last %d cells of the window (%s > %.6g): the front absorbing layer of the "
                       "dielectric blocks (decision 100) damps its fields there; start it further behind the front edge\n",
-                    c.name.c_str(), L, zl);
+                    c.name.c_str(), L, s.cfg.rz ? "z" : "x", zl);
         }
     }
     void apply(Simulation& s) override {
         if (s.istep % 20 != 0) return;
-        const int L = s.rz->zabs_hi;
+        const int L = s.cfg.rz ? s.rz->zabs_hi : s.fields->dfront;   // Cart3D / 2D: x is the window axis
         const double zl = (s.dom.wx + s.dom.N[0] - L) * s.dom.h[0];
         for (size_t i = 0; i < s.species.size(); ++i) {
             if (entering_[i] || s.species[i].q == 0) continue;
@@ -232,9 +232,9 @@ public:
             if (c == 0) { in_[i] = false; continue; }
             if (in_[i] && s.istep - last_[i] < 2000) continue;
             if (s.comm.rank == 0)
-                std::fprintf(stderr, "warning: step %ld: %.0f particles of species %s %s the last %d cells of the window (z > %.6g), "
+                std::fprintf(stderr, "warning: step %ld: %.0f particles of species %s %s the last %d cells of the window (%s > %.6g), "
                              "the front absorbing layer of the dielectric blocks (decision 100): their fields are damped there\n",
-                             s.istep, c, s.species[i].name.c_str(), in_[i] ? "still in" : "inside", L, zl);
+                             s.istep, c, s.species[i].name.c_str(), in_[i] ? "still in" : "inside", L, s.cfg.rz ? "z" : "x", zl);
             ++s.front_layer_warnings;
             in_[i] = true;
             last_[i] = s.istep;
@@ -247,6 +247,7 @@ private:
 }  // namespace
 
 std::unique_ptr<Operator> make_rz_plane_operator() { return std::make_unique<RZPlane>(); }
+std::unique_ptr<Operator> make_front_layer_watch() { return std::make_unique<RZFrontLayerWatch>(); }
 std::unique_ptr<Operator> make_rz_move_deposit_operator() { return std::make_unique<RZMoveDeposit>(); }
 
 void Simulation::setup_rz() {
@@ -270,6 +271,8 @@ void Simulation::setup_rz() {
     }
     if (!cfg.dielectrics.empty()) {                // dielectric regions (rz_dielectric.hpp, decision 100)
         rz->diel = std::make_shared<DielectricRZ>(cfg.dielectrics, dom, rz->grid());
+        // eps depending on phi: chi on the 2M - 1 angles (E_phi at the staggered angles of the metal block, if any)
+        rz->diel->set_angles(dom, rz->grid(), cfg.modes, rz->metal_phi && !rz->metal_phi->cfg.spectral);
         // moving window: an absorbing layer of 32 cells at the front edge (decision 100). In a dielectric the grid-scale branch of the
         // scheme runs ahead of c (mu_z E of the z-Nyquist mode is 0: no polarization there) and grows at the moving open edge; ahead
         // of a beam at v ~ c nothing physical is there

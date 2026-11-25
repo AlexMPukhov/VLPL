@@ -936,6 +936,7 @@ int main(int argc, char** argv) {
     run("test_structure", [&] { test_structure(comm); });
     run("test_rz_structure", [&] { test_rz_structure(comm); });
     run("test_rz_dielectric", [&] { test_rz_dielectric(comm); });
+    run("test_dielectric3d", [&] { test_dielectric3d(comm); });
     run("test_ionization", [&] { test_ionization(comm); });
     run("test_qed", [&] { test_qed(comm); });
     run("test_collisions", [&] { test_collisions(comm); });

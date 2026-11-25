@@ -1,5 +1,6 @@
 #include "pml.hpp"
 #include "metal3d.hpp"
+#include "dielectric3d.hpp"
 #include "side.hpp"
 #include "tfsf.hpp"
 #include <cmath>
@@ -67,6 +68,8 @@ void rip_cc_step_pml(Fields& F, Pml& P, Comm& comm, const BoundaryHooks& hooks, 
     const FV Jx = F.jx.view(), Jy = F.jy.view(), Jz = F.jz.view();
     const FV Exs = F.exs_.view(), Bxs = F.bxs_.view();
     const bool oy = P.cfg.on[1], oz = P.cfg.on[2];
+    const bool de = F.diel != nullptr;              // dielectric (dielectric3d.hpp, decision 100)
+    const Diel3View dv = de ? F.diel->view() : Diel3View{};
     const Cp yn{oy ? P.a_n[1].data() : nullptr, oy ? P.b_n[1].data() : nullptr, d.off[1]};
     const Cp yh{oy ? P.a_h[1].data() : nullptr, oy ? P.b_h[1].data() : nullptr, d.off[1]};
     const Cp zn{oz ? P.a_n[2].data() : nullptr, oz ? P.b_n[2].data() : nullptr, d.off[2]};
@@ -79,7 +82,7 @@ void rip_cc_step_pml(Fields& F, Pml& P, Comm& comm, const BoundaryHooks& hooks, 
         const double gby = zn((By(i, j, k) - By(i, j, k - 1)) * iz, PBY, k, i, j, k);
         const double gez = yh((Ez(i, j + 1, k) - Ez(i, j, k)) * iy, PEZ, j, i, j, k);
         const double gey = zh((Ey(i, j, k + 1) - Ey(i, j, k)) * iz, PEY, k, i, j, k);
-        Exs(i, j, k) = Ex(i, j, k) + 0.5 * D * (gbz - gby - Jx(i, j, k));
+        Exs(i, j, k) = Ex(i, j, k) + (de ? 0.5 * D / (1 + dv.cx(i, j, k)) : 0.5 * D) * (gbz - gby - Jx(i, j, k));
         Bxs(i, j, k) = Bx(i, j, k) - 0.5 * D * (gez - gey);
     });
     if (F.metal) metal_fix_pred(d, F.metal->view(), Exs, Bxs, 0);   // embedded metal (metal3d.hpp)
@@ -118,6 +121,10 @@ void rip_cc_step_pml(Fields& F, Pml& P, Comm& comm, const BoundaryHooks& hooks, 
     if (F.side) F.side->fix_transport(nEy, nEz, nBy, nBz, 0);
     if (F.metal) metal_fix_transport(d, F.metal->view(), nEy, nEz, nBy, nBz);
     comm.exchange(d, {&F.ney_, &F.nez_, &F.nby_, &F.nbz_});
+    if (de) {                                      // the polarization current of E_y, E_z: lines along x
+        F.diel->correct(comm, d, F, F.ney_, F.nez_, F.nby_, F.nbz_);
+        comm.exchange(d, {&F.ney_, &F.nez_, &F.nby_, &F.nbz_});
+    }
 
     // 3. corrector with the time-centred transverse fields
     const FV CBZ = P.c_bz_y.view(), CEZ = P.c_ez_y.view(), CBY = P.c_by_z.view(), CEY = P.c_ey_z.view();
@@ -128,7 +135,7 @@ void rip_cc_step_pml(Fields& F, Pml& P, Comm& comm, const BoundaryHooks& hooks, 
         const double ey0 = 0.5 * (Ey(i, j, k) + nEy(i, j, k)), eyp = 0.5 * (Ey(i, j, k + 1) + nEy(i, j, k + 1));
         const double gbz = yn((bz0 - bzm) * iy, CBZ, j, i, j, k), gby = zn((by0 - bym) * iz, CBY, k, i, j, k);
         const double gez = yh((ezp - ez0) * iy, CEZ, j, i, j, k), gey = zh((eyp - ey0) * iz, CEY, k, i, j, k);
-        Ex(i, j, k) += D * (gbz - gby - Jx(i, j, k));
+        Ex(i, j, k) += (de ? D / (1 + dv.cx(i, j, k)) : D) * (gbz - gby - Jx(i, j, k));
         Bx(i, j, k) -= D * (gez - gey);
     });
     if (F.side) F.side->fix_corr(Ex, Bx);

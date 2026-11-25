@@ -28,6 +28,7 @@
 #include "qed.hpp"
 #include "collisions.hpp"
 #include "metal3d.hpp"
+#include "dielectric3d.hpp"
 #include "external.hpp"
 #include "beam_import.hpp"
 #include "wake.hpp"
@@ -163,6 +164,7 @@ struct Config {
     SideFluxConfig side_flux;                    // block side_flux
     void check_structure() const;
     std::vector<DielectricConfig> dielectrics;   // blocks `dielectric [<name>]`: eps(r, z) in RZ, RIP-CC (rz_dielectric.hpp, decision 100)
+    std::vector<Dielectric3Config> dielectrics3; // the same blocks in Cart3D / 2D: eps(x, y, z), RIP-CC (dielectric3d.hpp)
     double plane_z = -1;                         // RZ output.plane_z: the field crossing this lab plane every step (< 0: none)
     long axis_every = 0;                         // RZ output.axis_every: Ez on the axis of the window (0: none)
     BoostConfig boost;                           // block boost (docs/specs/boosted_frame.md, decision 87)
@@ -207,6 +209,7 @@ void rz_absorber_zero_currents(FieldsRZ& f, int cells);
 double rz_absorber_count(Species& sp, double rrm, double& count);
 void absorber_report(Simulation& s, FILE* f);
 std::unique_ptr<Operator> make_rz_plane_operator();   // RZ output.plane_z / axis_every (src/rz_sim.cpp)
+std::unique_ptr<Operator> make_front_layer_watch();   // dielectric + window: charged particles in the front layer (src/rz_sim.cpp)
 std::unique_ptr<Operator> make_rz_move_deposit_operator();   // RZ stage MoveDeposit with spin / QED (src/rz_sim.cpp)
 // Cart3D push and deposit of species i with the deck's deposit path (Pusher::None: move and deposit only), and the rest of the
 // push stage after all species (ionization currents, guards, filter, side fluid)
@@ -231,7 +234,7 @@ public:
     void write_slices();                         // x-y slices as float32 files in dir/slices
     bool finished() const { return t >= cfg.t_end - 0.5 * dom.dt(); }
     long istep = 0;
-    long front_layer_warnings = 0;               // RZ dielectric + window: warnings of charged particles in the front layer (decision 100)
+    long front_layer_warnings = 0;               // dielectric + window (RZ, Cart3D, 2D): warnings of charged particles in the front layer (decision 100)
     double t = 0;
     long restart_step = -1;                      // step of the checkpoint this run started from, -1: none
     std::string restart_path;                    // the checkpoint this run started from ("": none; read_op_state)
@@ -310,6 +313,7 @@ public:
     RzTfsf* rz_tfsf() { return rz_tfsf_.get(); }   // RZ: the TFSF plane (null: none)
     // structure runs (src/structure.cpp): the metal, the quadrupole table, beams from files, the wake diagnostics
     std::unique_ptr<Metal3> metal3;              // block metal; null: none
+    std::unique_ptr<Dielectric3> diel3;          // blocks dielectric in Cart3D / 2D; null: none
     void setup_structure();                      // in the constructor (after the fields)
     void load_file_species(size_t i);            // species.file
     double metal_absorb_all();                   // particles inside the metal absorbed (kinetic energy removed, local)

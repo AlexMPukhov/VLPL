@@ -52,6 +52,8 @@ public:
     void allreduce_sum(double* v, int n);
     // every rank's n values, in rank order, into recv (size * n values)
     void allgather(const double* send, int n, double* recv);
+    // the same within the row of ranks along x (equal coords[1], coords[2]), in the order of coords[0] (dims[0] * n values)
+    void allgather_x(const double* send, int n, double* recv);
     double allreduce_max(double v);
     void bcast(std::string& s);                         // rank 0's string to every rank
     void barrier();
@@ -59,6 +61,7 @@ private:
     void halo(const Domain& d, std::vector<Field*>& f, int axis, bool add);
 #ifdef RIP_MPI
     MPI_Comm cart_ = MPI_COMM_NULL;
+    MPI_Comm row_x_ = MPI_COMM_NULL;        // allgather_x (made on first use)
 #endif
     Buf<double> dsb_, drb_;                 // device pack buffers, two slabs (one per direction) each
     double* hsb_ = nullptr;                 // pinned host staging (GPU build), 2 x hcap_ doubles each

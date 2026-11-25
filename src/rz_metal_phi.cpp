@@ -10,7 +10,14 @@
 #include "species.hpp"
 
 namespace {
-constexpr int MAXNP = 255;             // angles per kernel thread (modes <= 128)
+constexpr int MAXNP = RZ_PHI_MAXNP;   // angles per kernel thread (modes <= 128)
+HD inline double at_angle(const FV& F, int i, int j, int k, const double* tc, const double* ts, int M) {
+    return rz_phi_at_angle(F, i, j, k, tc, ts, M);
+}
+HD inline void add_back(const FV& F, int i, int j, const int* ks, const double* d, int n, const double* tc, const double* ts, int M,
+                        int np) {
+    rz_phi_add_back(F, i, j, ks, d, n, tc, ts, M, np);
+}
 }
 
 MetalPhi::MetalPhi(const MetalPhiConfig& c, const Domain& d, int modes, const std::vector<double>& rnodes)
@@ -104,34 +111,6 @@ std::string MetalPhi::describe() const {
     return "  metal: function \"" + cfg.text + "\"" + s;
 }
 
-namespace {
-// field value at angle k (table c, s: integer or staggered angles) from the slots of (i, j): F_0 + 2 sum (Re F_m cos - Im F_m sin)
-HD inline double at_angle(const FV& F, int i, int j, int k, const double* tc, const double* ts, int M) {
-    double s = F(i, j, 0);
-    const double* c = tc + size_t(k) * M;
-    const double* sn = ts + size_t(k) * M;
-    for (int m = 1; m < M; ++m) s += 2 * (F(i, j, 2 * m - 1) * c[m] - F(i, j, 2 * m) * sn[m]);
-    return s;
-}
-// adds the changes d at the angles ks[0 .. n) back to the modes: dF_0 = sum d / Np, dRe F_m = sum d cos / Np,
-// dIm F_m = -sum d sin / Np (exact for degree M - 1 on 2M - 1 angles, also on the staggered ones)
-HD inline void add_back(const FV& F, int i, int j, const int* ks, const double* d, int n, const double* tc, const double* ts, int M,
-                        int np) {
-    const double w = 1.0 / np;
-    double s0 = 0;
-    for (int q = 0; q < n; ++q) s0 += d[q];
-    F(i, j, 0) += w * s0;
-    for (int m = 1; m < M; ++m) {
-        double a = 0, b = 0;
-        for (int q = 0; q < n; ++q) {
-            a += d[q] * tc[size_t(ks[q]) * M + m];
-            b -= d[q] * ts[size_t(ks[q]) * M + m];
-        }
-        F(i, j, 2 * m - 1) += w * a;
-        F(i, j, 2 * m) += w * b;
-    }
-}
-}  // namespace
 
 void rz_metal_phi_apply(const MetalPhi& mp, FieldsRZ& f, int stage, Field& fa, Field& fb, Field* fc, Field* fe) {
     const Domain& d = f.dom();

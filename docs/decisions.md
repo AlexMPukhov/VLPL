@@ -1611,6 +1611,29 @@ Accepted by Alexander on 2026-10-26 (merge of the architecture spec, PR #1).
      - Tests: tests/test_rz_dielectric.cpp D1-D6, tests/mpi.sh (window + rings + gaps + collar; periodic cyclic), the
        benchmarks in bench/rz_dielectric/ (README there: DWA against the lined-tube theory, the Cherenkov cone, thin-wall
        convergence).
+     - Generic metal (Alexander, 2026-11-24: "dielectrics and metals have to be implemented in general", not only with the
+       rings): the dielectric blocks with the block metal (decision 103, also depending on phi). Options: (a) the lines on the
+       2M - 1 collocation angles, (b) the per-mode lines iterated with the angle-dependent zeros (Jacobi on the mode coupling:
+       two sweeps stable only to chi 2.9, one or three unstable). Alexander chose (a) ("Solve on angles", 2026-11-24). The
+       modes and the angle values are a bijection (Parseval), so each angle is the line above with that angle's masks (Mh for
+       E_r, Mp for E_phi at its staggered angles), the corrections per angle with the face rules rBp / rBr, then back to the
+       modes; the window entry applies the E_z rule per angle column by column. Without the metal block nothing changes. Tests:
+       P6 axisymmetric metal function + dielectric = rings + dielectric (3.9e-15), P7 square guide filled with eps: sqrt(eps)
+       k_c = vacuum k_c (3e-9), P8 corrugated square pipe + dielectric, 3000 steps (energy bounded, div D 7e-15), D4 with no
+       metal and with phi ridges, tests/mpi.sh square pipe + lining in a window.
+     - eps from a deck expression of x, y, z, r, phi (2026-11-24; Alexander: Q2 (a), the per-component rule of the rectangles
+       from sub-samples: harmonic along the component's direction, arithmetic across; the full anisotropic tensor not
+       done). Axisymmetric: chi per (r, z) as before (D7 function = rectangles 4.5e-15, D8 graded tube vs the radial ODE
+       7.9e-5 / 2.0e-5, second order, D9 window). Depending on phi: chi on the 2M - 1 angles, every operation with chi
+       through the angles (D10 = the axisymmetric path 6e-15, D11 half-filled pipe vs polar finite differences: 16 modes
+       -5.9e-7).
+     - Cart3D and 2D (2026-11-24; Alexander: Q3, the same scheme, lines along x, the front layer and its warning;
+       docs/specs/dielectric3d.md, src/dielectric3d.*): eps a number or an expression of x, y, z; E_x local, E_y / E_z lines
+       along x per (j, k), the partition solve over the row of ranks along x (Comm::allgather_x, an MPI_Cart_sub row: ranks
+       along y, z independent); the metal block's x faces; the CPML step too; chi per component from 4^3 sub-samples
+       (harmonic along its direction), periodic axes wrapped (the guards must hold their partners' chi: without the wrap a
+       non-uniform eps broke div D by 0.1). Tests E1-E4 (div D 5e-15; normal incidence: reflection -1/3 to 4e-16, the
+       transmission to the grid dispersion; oblique p / s against Fresnel 8e-3 / 6e-4; window with the warning), tests/mpi.sh.
 
 101. **The longitudinal fields of the TFSF incident grid from the discrete constraints.** (docs/specs/tfsf.md, 2026-11-01; renumbered from 64 at the merge with main, 2026-11-13)
     - Alexander: a static field left where the pulse started usually means an incorrectly initialized longitudinal

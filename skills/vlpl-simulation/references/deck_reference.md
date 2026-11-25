@@ -278,13 +278,17 @@ rings     { r_in, r_out, period, gap, z_start, z_end, jacket }   # embedded perf
                                      # (closed corrugated pipe with an open end at z_end); one convenience geometry: conductors
                                      # of any shape (also axisymmetric) with the block metal below
 dielectric [<name>] { r_in, r_out, z_start, z_end, eps, ramp }   # lossless dielectric eps(r, z), rectangles fixed in the lab frame,
+                                     # or eps = <expression of x, y, z, r, phi with units> (e.g. 1 + 1.5 * (1 - (r / 0.5 mm)^2);
+                                     # with x, y or phi chi lives on the 2M - 1 angles),
+                                     # then the rectangle keys are an optional bounding box; sampled 8 x 8 per control volume,
                                      # chi = eps - 1 added; metal wins; time-centred polarization current (a tridiagonal line
                                      # along z per row, stable and lossless for any eps), div D = rho at round-off; cut cells
                                      # sub-cell averaged; ramp: linear z ends; with a moving window the last 32 cells at the front
                                      # edge absorb (keep beams behind them); rip_cc only (docs/specs/rz_dielectric.md, decision 100)
                                      # (a warning, at the start and during the run, when charged particles are inside it);
-                                     # several blocks combine (any union of rectangles); with metal: only the rings block so far
-                                     # (not the metal block); examples bench/rz_dielectric/dwa.deck (a lined tube, the wall the
+                                     # several blocks combine (any union of rectangles); with metal: the rings block or the
+                                     # metal block (also depending on phi: the lines solved on the 2M - 1 angles);
+                                     # examples bench/rz_dielectric/dwa.deck (a lined tube, the wall the
                                      # grid edge), cherenkov.deck
 metal     { function, phi_derivative = difference|spectral, enabled = true }   # RZ: conductors that depend on the azimuth:
                                      # metal where function(x, y, z, r, phi) > 0 (lab frame, also with the window), on the
@@ -317,6 +321,13 @@ inside external quadrupoles, with the wake diagnostics. Files written for z-prop
 metal     { function = f(x, y, z) }  # perfect conductor where f > 0 (absolute coordinates, lab-fixed, also with the window):
                                      # staircase on the RIP-CC grid (tangential E = 0, total reflection at x faces through the
                                      # RIP transport, the Gauss law exact off the surface), particles inside absorbed; rip_cc only
+dielectric [<name>] { eps }          # lossless dielectric, Cart3D and 2D (docs/specs/dielectric3d.md, decision 100): eps a number
+                                     # (everywhere) or an expression of x, y, z (lab frame, units), blocks add their eps - 1;
+                                     # time-centred polarization current (lines along x, ranks along x by a partition solve),
+                                     # stable and lossless for any eps, div D = rho at round-off; chi per component from 4^3
+                                     # sub-samples (harmonic along its direction); with the metal block; CPML; with a moving
+                                     # window the last 32 cells at the front edge absorb (a warning for charged particles in them);
+                                     # rip_cc only, no side tube, no boosted frame
 quadrupole <name> { x_start, length, gradient [T/m], y_center, z_center }   # hard-edged, on the particles only:
                                      # B_y = -G (z - z_c), B_z = -G (y - y_c) (G > 0 focuses electrons in y); averaged over the
                                      # x crossed during the kick, so edges between the grid points are exact

@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include "expr.hpp"
+#include "grid.hpp"
 #include "portable.hpp"
 
 struct MetalPhiConfig {
@@ -91,6 +92,37 @@ struct MetalPhiView {
         return np > 0 && (any_node(I, j) || any_node(I, j + 1) || any_node(I + 1, j) || any_node(I + 1, j + 1));
     }
 };
+
+// Mode slots <-> collocation angles (also used by the dielectric line solves on the angles, rz_dielectric.cpp):
+constexpr int RZ_PHI_MAXNP = 255;      // angles per kernel thread (modes <= 128)
+// field value at angle k (table c, s: integer or staggered angles) from the slots of (i, j): F_0 + 2 sum (Re F_m cos - Im F_m sin)
+HD inline double rz_phi_at_angle(const FV& F, int i, int j, int k, const double* tc, const double* ts, int M) {
+    double s = F(i, j, 0);
+    const double* c = tc + size_t(k) * M;
+    const double* sn = ts + size_t(k) * M;
+    for (int m = 1; m < M; ++m) s += 2 * (F(i, j, 2 * m - 1) * c[m] - F(i, j, 2 * m) * sn[m]);
+    return s;
+}
+// adds the changes d at the angles ks[0 .. n) (ks = nullptr: all angles 0 .. np - 1, n = np) back to the modes:
+// dF_0 = sum d / Np, dRe F_m = sum d cos / Np, dIm F_m = -sum d sin / Np (exact for degree M - 1 on 2M - 1 angles, also on
+// the staggered ones)
+HD inline void rz_phi_add_back(const FV& F, int i, int j, const int* ks, const double* d, int n, const double* tc, const double* ts,
+                               int M, int np) {
+    const double w = 1.0 / np;
+    double s0 = 0;
+    for (int q = 0; q < n; ++q) s0 += d[q];
+    F(i, j, 0) += w * s0;
+    for (int m = 1; m < M; ++m) {
+        double a = 0, b = 0;
+        for (int q = 0; q < n; ++q) {
+            const size_t kk = size_t(ks ? ks[q] : q) * M + m;
+            a += d[q] * tc[kk];
+            b -= d[q] * ts[kk];
+        }
+        F(i, j, 2 * m - 1) += w * a;
+        F(i, j, 2 * m) += w * b;
+    }
+}
 
 class FieldsRZ;
 class Species;

@@ -303,16 +303,49 @@ Config Config::from_deck(const Deck& d) {
         if (!d.flag(b, "enabled", true)) continue;
         DielectricConfig e;
         e.name = b == "dielectric" ? "" : b.substr(11);
+        // eps: a number (a rectangle r_in .. r_out, z_start .. z_end) or an expression of x, y, z, r, phi (lab frame, with units;
+        // the rectangle keys then bound it and are optional; x, y or phi: chi per angle)
+        std::string et = d.str(b, "eps");
+        if (et.size() >= 2 && et.front() == '"' && et.back() == '"') et = et.substr(1, et.size() - 2);
+        const UnitFn u = [k0](const std::string& n, double& f) { return unit_to_code(n, k0, f); };
+        if (!c.rz) {                                 // Cart3D / 2D (dielectric3d.hpp): eps a number (everywhere) or of x, y, z
+            for (const char* k : {"r_in", "r_out", "z_start", "z_end", "ramp"})
+                if (d.has(b, k)) throw std::runtime_error(b + "." + k + ": RZ only; in Cart3D / 2D give eps as an expression of x, y, z");
+            Dielectric3Config e3;
+            e3.name = e.name;
+            try {
+                Expr x(et, {"x", "y", "z"}, u);
+                bool cst = true;
+                for (const Expr::Ins& ins : x.program()) cst = cst && ins.op != Expr::VAR;
+                if (cst) e3.eps = x({0.0, 0.0, 0.0});
+                else e3.fn = x;
+            } catch (const std::exception& ex) {
+                throw std::runtime_error(b + ".eps: a number or an expression of x, y, z (" + ex.what() + ")");
+            }
+            c.dielectrics3.push_back(e3);
+            continue;
+        }
+        bool constant = true;
+        try {
+            Expr x(et, {"x", "y", "z", "r", "phi"}, u);
+            for (const Expr::Ins& ins : x.program()) {
+                if (ins.op != Expr::VAR) continue;
+                constant = false;
+                if (ins.arg == 0 || ins.arg == 1 || ins.arg == 4) e.phi = true;
+            }
+            if (constant) e.eps = x({0.0, 0.0, 0.0, 0.0, 0.0});
+            else e.fn = x;
+        } catch (const std::exception& ex) {
+            throw std::runtime_error(b + ".eps: a number or an expression of x, y, z, r, phi (" + ex.what() + ")");
+        }
+        const bool fn = !e.fn.empty();
         e.r_in = d.num(b, "r_in", Kind::Length, 0.0) * k0;
-        e.r_out = d.num(b, "r_out", Kind::Length) * k0;
-        e.z_start = d.num(b, "z_start", Kind::Length) * k0;
-        e.z_end = d.num(b, "z_end", Kind::Length) * k0;
-        e.eps = d.num(b, "eps", Kind::None);
+        e.r_out = fn && !d.has(b, "r_out") ? 1e300 : d.num(b, "r_out", Kind::Length) * k0;
+        e.z_start = fn && !d.has(b, "z_start") ? -1e300 : d.num(b, "z_start", Kind::Length) * k0;
+        e.z_end = fn && !d.has(b, "z_end") ? 1e300 : d.num(b, "z_end", Kind::Length) * k0;
         e.ramp = d.num(b, "ramp", Kind::Length, 0.0) * k0;
         c.dielectrics.push_back(e);
     }
-    if (!c.rz && !c.dielectrics.empty()) throw std::runtime_error("the dielectric blocks need grid.geometry = rz");
-    if (c.metal_rz.on && !c.dielectrics.empty()) throw std::runtime_error("RZ: the metal block with dielectric blocks is not supported yet");
     if (!c.rz && (c.rings.on || c.plane_z >= 0 || c.axis_every > 0))
         throw std::runtime_error("the rings block, output.plane_z and output.axis_every need grid.geometry = rz");
     for (const std::string& b : d.block_names()) {   // docs/specs/harmonic_focus.md
@@ -837,7 +870,7 @@ void Config::check_rz() const {
     if (metal_rz.on && solver != Solver::RipCC) throw std::runtime_error("metal (embedded conductors): numerics.solver = rip_cc only");
     for (const LaserConfig& L : all_lasers())
         if (metal_rz.on && L.enabled && L.tfsf_x >= 0) throw std::runtime_error("metal: no laser.tfsf_x (the incident grid has no metal)");
-    if (!dielectrics.empty() && solver != Solver::RipCC) throw std::runtime_error("dielectric: numerics.solver = rip_cc only (iRIP: the medium block)");
+    if ((!dielectrics.empty() || !dielectrics3.empty()) && solver != Solver::RipCC) throw std::runtime_error("dielectric: numerics.solver = rip_cc only (iRIP: the medium block)");
     if (x_abs_cells > 0 && window.enabled) throw std::runtime_error("grid.boundary_z = absorbing: not with a moving window");
     for (const LaserConfig& L : all_lasers())
         if (L.enabled && L.tfsf_x >= 0 && window.enabled) throw std::runtime_error("geometry = rz: laser.tfsf_x not with a moving window");
@@ -1204,6 +1237,14 @@ Simulation::Simulation(const Config& c, Comm& cm) : cfg(c), comm(cm) {
     }
     gauss0_.resize(dom); work_.resize(dom);
     setup_structure();                                 // metal, quadrupole table (src/structure.cpp)
+    if (!cfg.dielectrics3.empty()) {                   // dielectrics in Cart3D / 2D (dielectric3d.hpp, decision 100)
+        if (side_) throw std::runtime_error("dielectric: not with the side tube (side_injection)");
+        diel3 = std::make_unique<Dielectric3>(cfg.dielectrics3, dom);
+        fields->diel = diel3.get();
+        // moving window: the 32-cell front absorbing layer of decision 100 (the grid-scale branch outruns c in a dielectric)
+        if (cfg.window.enabled && !dom.periodic[0] && cfg.x_abs_cells == 0) { fields->dfront = 32; fields->dfront_kappa = 1.5 * std::log(1e3) / 32; }
+        if (comm.rank == 0) std::printf("%s", diel3->describe().c_str());
+    }
     // the projection filter needs y, z periodic (no pml, no side tube) and ranks along x only (decision 69); otherwise the
     // local filter, whose change of J radiates at the grid scale (decision 71)
     if (c.filter_passes > 0 && !c.filter_local && !c.filter_binomial &&
@@ -1226,6 +1267,7 @@ Simulation::Simulation(const Config& c, Comm& cm) : cfg(c), comm(cm) {
     }
     if (medium && medium->bc.ion) pipeline.add(make_medium_ionize_operator());   // O7 bound: electron-ion pairs (before the migration)
     if (metal3) pipeline.add(make_metal_absorb_operator());   // particles that entered the metal (metal3d.hpp)
+    if (diel3 && fields->dfront > 0) pipeline.add(make_front_layer_watch());   // dielectric + window (decision 100)
     pipeline.add(std::make_unique<Migrate>());
     tiles = tile_grid(dom, c.tile);
     const bool can_sort = c.sort_every != 0;          // auto (-1) sorts if the deposit needs it

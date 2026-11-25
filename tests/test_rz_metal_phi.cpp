@@ -114,9 +114,10 @@ double peak_frequency(const std::vector<double>& s, double wlo, double whi) {
 
 // The cutoff k_c of the cross-section mode excited by g (TM: E_z at the nodes, TE: B_z at the half nodes), z uniform
 // (periodic, 4 cells), from the dominant frequency with sin(w dt / 2) = dt k_c / 2 (RIP-CC at k_z = 0).
+// eps > 1: the whole cross-section filled (a dielectric block beyond the grid); returned: sqrt(eps) k_c (= k_c of vacuum)
 double cutoff(Comm& comm, const std::string& metal, int M, int nr, double R, bool tm,
               const std::function<double(double, double)>& g, double periods, double kguess, double kappa = 0,
-              double* dz_out = nullptr) {
+              double* dz_out = nullptr, double eps = 1) {
     const double kmax = 3 * kguess;
     const double dr = R / nr;
     RadialGrid rg = rz_radial_grid(nr, dr);
@@ -126,6 +127,11 @@ double cutoff(Comm& comm, const std::string& metal, int M, int nr, double R, boo
     if (dz_out) *dz_out = dz;
     FieldsRZ f(d, M, std::move(rg));
     f.set_metal_phi(make_metal(metal, d, f));
+    if (eps > 1) {
+        DielectricConfig e;
+        e.r_in = 0; e.r_out = 2 * R; e.z_start = -1; e.z_end = 4 * dz + 1; e.eps = eps;
+        f.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{e}, d, f.grid());
+    }
     Field& F = tm ? f.ez : f.bz;
     std::vector<double> h = F.host();
     for (int i = 0; i < d.n[0]; ++i)
@@ -137,7 +143,7 @@ double cutoff(Comm& comm, const std::string& metal, int M, int nr, double R, boo
     comm.exchange(d, all(f));
     std::vector<double> s;
     const std::vector<double> h0 = F.host();
-    const int steps = int(periods * 2 * M_PI / (kguess * dz));
+    const int steps = int(periods * 2 * M_PI * std::sqrt(eps) / (kguess * dz));
     for (int n = 0; n < steps; ++n) {
         f.zero_currents(); f.step(comm);
         const std::vector<double> x = F.host();
@@ -146,8 +152,8 @@ double cutoff(Comm& comm, const std::string& metal, int M, int nr, double R, boo
             for (int q = 0; q < 2 * M - 1; ++q) v += (q ? 2 : 1) * (j + 0.5) * x[F.idx(0, j, q)] * h0[F.idx(0, j, q)];
         s.push_back(comm.allreduce_max(v));
     }
-    const double w = peak_frequency(s, 0.2 * dz, 2 * std::asin(std::min(1.0, kmax * dz / 2)));
-    return 2 / dz * std::sin(w / 2);
+    const double w = peak_frequency(s, 0.2 * dz / std::sqrt(eps), 2 * std::asin(std::min(1.0, kmax * dz / 2)));
+    return 2 / dz * std::sin(w / 2) * std::sqrt(eps);
 }
 
 // P2. Square guide |x|, |y| < b = 0.6 in a pipe R = 1 (nr = 40): the lowest TM (TM11, modes 0, 4, 8, ..) and TE (TE10,
@@ -321,6 +327,140 @@ void plasma(Comm& comm) {
     check("rz metal_phi: the metal block with iRIP rejected", rejected, "");
     if (comm.rank == 0) std::remove(path);
 }
+
+// Dielectric blocks with the block metal (decision 100, generic: the lines solved on the 2M - 1 angles, Alexander 2026-11-24)
+DielectricConfig dblock(double rin, double rout, double z0, double z1, double eps) {
+    DielectricConfig c;
+    c.r_in = rin; c.r_out = rout; c.z_start = z0; c.z_end = z1; c.eps = eps;
+    return c;
+}
+
+// P6. An axisymmetric metal function (spectral) with dielectric blocks = the rings block with the same blocks: the lines on the
+//     angles against the lines on the modes (gaps filled, a block across a ring face, one beyond the rings), random fields in
+//     modes 0..2, 300 steps, to round-off.
+void dielectric_rings(Comm& comm) {
+    const int nz = 40, nr = 16, M = 3;
+    const double dr = 0.1, dz = 0.05;
+    Domain d = rz_domain(comm, nz, nr, M, dz, dr, true, Solver::RipCC);
+    FieldsRZ a(d, M), b(d, M);
+    RingsConfig rc;
+    rc.on = true; rc.r_in = 0.6; rc.r_out = 1.2; rc.period = 1.0; rc.gap = 0.5; rc.z_start = 0.2; rc.z_end = 2.0;
+    a.metal = rz_metal_setup(rc, nz, dz, true, a.grid());
+    b.set_metal_phi(make_metal("(z - floor(z)) >= 0.175 && (z - floor(z)) <= 0.725 && r >= 0.55 && r <= 1.25", d, b, true));
+    const std::vector<DielectricConfig> bl = {dblock(0.6, 1.2, 0.0, 2.0, 2.1), dblock(0.2, 0.83, 0.61, 1.37, 3.8),
+                                              dblock(1.2, 1.45, 0.3, 1.1, 1.6)};
+    for (FieldsRZ* f : {&a, &b}) f->diel = std::make_shared<DielectricRZ>(bl, d, f->grid());
+    std::mt19937 rng(11);
+    std::uniform_real_distribution<double> U(-1, 1);
+    std::vector<Field*> fa = all(a), fb = all(b);
+    for (Field* F : fa) {
+        std::vector<double> h = F->host();
+        for (int i = 0; i < d.n[0]; ++i)
+            for (int j = 0; j < nr; ++j)
+                for (int s = 0; s < 2 * M - 1; ++s) h[F->idx(i, j, s)] = (j == 0 && s > 0) ? 0 : U(rng);
+        F->upload(h);
+    }
+    for (int c = 0; c < 6; ++c) fb[size_t(c)]->upload(fa[size_t(c)]->host());
+    comm.exchange(d, fa); comm.exchange(d, fb);
+    for (int n = 0; n < 300; ++n) { a.zero_currents(); a.step(comm); b.zero_currents(); b.step(comm); }
+    double diff = 0, sc = 0;
+    for (int c = 0; c < 6; ++c) {
+        const std::vector<double> x = fa[size_t(c)]->host(), y = fb[size_t(c)]->host();
+        for (int s = 0; s < 2 * M - 1; ++s)
+            for (int i = 0; i < d.n[0]; ++i)
+                for (int j = 0; j < nr; ++j) {
+                    diff = std::max(diff, std::abs(x[fa[size_t(c)]->idx(i, j, s)] - y[fb[size_t(c)]->idx(i, j, s)]));
+                    sc = std::max(sc, std::abs(x[fa[size_t(c)]->idx(i, j, s)]));
+                }
+    }
+    diff = comm.allreduce_max(diff) / comm.allreduce_max(sc);
+    check("rz metal_phi P6: axisymmetric metal function + dielectric blocks = rings + the same blocks (lines on the angles vs on the "
+          "modes; modes 0..2, random fields, 300 steps)",
+          diff < 1e-12, fmt("max difference %.1e of max", diff));
+}
+
+// P7. The square guide of P2 filled with eps (2.1, 3.8): at k_z = 0 the polarization current divides every E update by eps, so
+//     sqrt(eps) k_c (from sin(w dt / 2) = dt k_c / (2 sqrt(eps))) equals the vacuum cutoff of the same grid. The metal mask
+//     depends on the angle: the lines on the angles keep E = 0 at the metal points of each angle.
+void dielectric_square(Comm& comm) {
+    const char* sq = "abs(x) > 0.6 || abs(y) > 0.6 || r > 1";
+    const double b = 0.6, a = 2 * b;
+    auto tm11 = [&](double x, double y) { return std::abs(x) < b && std::abs(y) < b ? std::cos(M_PI * x / a) * std::cos(M_PI * y / a) : 0.0; };
+    auto te10 = [&](double x, double y) { return std::abs(x) < b && std::abs(y) < b ? std::sin(M_PI * x / a) : 0.0; };
+    std::string info;
+    double emax = 0;
+    for (int tm = 1; tm >= 0; --tm) {
+        const double cont = tm ? std::sqrt(2.0) * M_PI / a : M_PI / a;
+        const double k1 = cutoff(comm, sq, 8, 40, 1.0, tm, tm ? std::function<double(double, double)>(tm11) : te10, 40, cont);
+        info += std::string(tm ? " TM11" : " TE10") + fmt(" vacuum %.6f:", k1);
+        for (double eps : {2.1, 3.8}) {
+            const double k = cutoff(comm, sq, 8, 40, 1.0, tm, tm ? std::function<double(double, double)>(tm11) : te10, 40, cont, 0, nullptr, eps);
+            emax = std::max(emax, std::abs(k / k1 - 1));
+            info += fmt(" eps %.1f", eps) + fmt(" %+.1e;", k / k1 - 1);
+        }
+    }
+    check("rz metal_phi P7: square guide filled with eps 2.1 / 3.8 (8 modes): sqrt(eps) k_c = the vacuum k_c of the grid (TM11, TE10)",
+          emax < 1e-5, info);
+}
+
+// P8. Stability and Gauss law with dielectric: the corrugated square pipe of P4 (modes 0..6) with a partial lining (eps 3.8, a
+//     block crossing the teeth and the square), a rod (eps 2.1) and a block beyond the metal, random fields, 3000 steps: the
+//     energy (E.D + B^2) / 2 bounded, div D and div B off the metal unchanged.
+void dielectric_stability(Comm& comm) {
+    const int nz = 32, nr = 24, M = 7;
+    const double dr = 0.05;
+    const RadialGrid rg = rz_radial_grid(nr, dr);
+    const double dz = 0.95 * 2 / std::sqrt(rz_lambda_max(rg, M));
+    Domain d = rz_domain(comm, nz, nr, M, dz, dr, true, Solver::RipCC);
+    FieldsRZ f(d, M);
+    const std::string sq = "max(abs(x), abs(y))";
+    const double p = nz * dz / 2;
+    char text[600];
+    std::snprintf(text, sizeof text, "%s > 0.95 || (%s > 0.87 && (z - %.17g * floor(z / %.17g)) < %.17g)", sq.c_str(), sq.c_str(), p, p,
+                  2 * p / 3);
+    f.set_metal_phi(make_metal(text, d, f));
+    f.diel = std::make_shared<DielectricRZ>(std::vector<DielectricConfig>{dblock(0.62, 1.05, 0.13, 0.13 + 0.6 * nz * dz, 3.8),
+                                                                         dblock(0.0, 0.33, 0.4 * nz * dz, 0.8 * nz * dz, 2.1),
+                                                                         dblock(1.1, 1.3, 0.0, nz * dz, 1.5)}, d, f.grid());
+    std::mt19937 rng(5);
+    std::uniform_real_distribution<double> U(-1, 1);
+    for (Field* F : all(f)) {
+        std::vector<double> h = F->host();
+        for (int i = 0; i < d.n[0]; ++i)
+            for (int j = 0; j < nr; ++j)
+                for (int s = 0; s < 2 * M - 1; ++s) h[F->idx(i, j, s)] = (j == 0 && s > 0) ? 0 : U(rng);
+        F->upload(h);
+    }
+    comm.exchange(d, all(f));
+    f.zero_currents(); f.step(comm); f.zero_currents(); f.step(comm);    // the metal points zeroed by the first steps
+    Field ga, gb, da, db;
+    for (Field* F : {&ga, &gb, &da, &db}) F->resize(d);
+    f.div_e(ga); f.div_b(da);
+    const double w0 = f.energy();
+    double wmax = w0, wmin = w0;
+    for (int n = 0; n < 3000; ++n) {
+        f.zero_currents(); f.step(comm);
+        const double w = f.energy();
+        wmax = std::max(wmax, w); wmin = std::min(wmin, w);
+    }
+    f.div_e(gb); f.div_b(db);
+    const MetalPhiView pv = f.metal_phi->host_view();
+    const std::vector<double> A = ga.host(), B = gb.host(), C = da.host(), D = db.host();
+    double dg = 0, ddb = 0, sc = 0;
+    for (int i = 0; i < d.n[0]; ++i)
+        for (int j = 0; j < nr; ++j)
+            for (int s = 0; s < 2 * M - 1; ++s) {
+                const long I = d.cell0(0) + i;
+                sc = std::max(sc, std::abs(A[ga.idx(i, j, s)]));
+                if (!(j == 0 && s > 0) && !pv.gauss_skip(I, j)) dg = std::max(dg, std::abs(A[ga.idx(i, j, s)] - B[gb.idx(i, j, s)]));
+                if (!pv.divb_skip(I, j)) ddb = std::max(ddb, std::abs(C[da.idx(i, j, s)] - D[db.idx(i, j, s)]));
+            }
+    dg = comm.allreduce_max(dg) / comm.allreduce_max(sc); ddb = comm.allreduce_max(ddb) / comm.allreduce_max(sc);
+    check("rz metal_phi P8: corrugated square pipe + dielectric lining / rod (modes 0..6), random fields, 3000 steps: energy (E.D + B^2)/2 "
+          "bounded, div D / div B off the metal unchanged",
+          wmax < 1.02 * w0 && wmin > 0.9 * w0 && dg < 1e-11 && ddb < 1e-11,
+          fmt("W/W0 in [%.4f, ", wmin / w0) + fmt("%.4f]", wmax / w0) + fmt(", d div D %.1e", dg) + fmt(", d divB %.1e", ddb));
+}
 }  // namespace
 
 void test_rz_metal_phi(Comm& comm) {
@@ -331,4 +471,7 @@ void test_rz_metal_phi(Comm& comm) {
     axis_cut(comm);
     stability(comm);
     plasma(comm);
+    dielectric_rings(comm);
+    dielectric_square(comm);
+    dielectric_stability(comm);
 }

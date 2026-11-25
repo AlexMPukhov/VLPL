@@ -1,6 +1,7 @@
 #include "fields.hpp"
 #include "prof.hpp"
 #include "metal3d.hpp"
+#include "dielectric3d.hpp"
 #include "side.hpp"
 #include "tfsf.hpp"
 #include <algorithm>
@@ -35,6 +36,7 @@ void fields_absorb_x(const Domain& d, int L, double kappa, const FV A, const FV 
 void Fields::step(Comm& comm, const BoundaryHooks& hooks, double t) {
     step_core(comm, hooks, t);
     if (xabs.cells > 0) fields_absorb_x(d_, xabs.cells, xabs.kappa, ex.view(), ey.view(), ez.view(), bx.view(), by.view(), bz.view());
+    if (dfront > 0) dielectric3_absorb_front(*this, d_, dfront, dfront_kappa);   // dielectric + window: the front layer (decision 100)
 }
 
 void Fields::step_core(Comm& comm, const BoundaryHooks& hooks, double t) {
@@ -49,14 +51,16 @@ void Fields::step_core(Comm& comm, const BoundaryHooks& hooks, double t) {
     const FV Ex = ex.view(), Ey = ey.view(), Ez = ez.view(), Bx = bx.view(), By = by.view(), Bz = bz.view();
     const FV Jx = jx.view(), Jy = jy.view(), Jz = jz.view();
     const FV Exs = exs_.view(), Bxs = bxs_.view();
+    const bool de = diel != nullptr;                // dielectric: (1 + chi_x) d_t E_x = curl B - J_x (decision 100)
+    const Diel3View dv = de ? diel->view() : Diel3View{};
 
     // 1. predictor for the longitudinal fields at n+1/2. The transport reads it one cell beyond the owned cells; it is
     // computed there too, from the guards of the fields and currents (copies of the neighbours' cells, 0 at open
     // edges), instead of being exchanged: the same values as the exchange gives (the same formula on the same
     // numbers), three messages per step fewer. With a side tube its face corrections need the exchange.
     auto pred = [=] HD(int i, int j, int k) {
-        Exs(i, j, k) = Ex(i, j, k) + 0.5 * D * ((Bz(i, j, k) - Bz(i, j - 1, k)) * iy -
-                                                (By(i, j, k) - By(i, j, k - 1)) * iz - Jx(i, j, k));
+        const double sx = (Bz(i, j, k) - Bz(i, j - 1, k)) * iy - (By(i, j, k) - By(i, j, k - 1)) * iz - Jx(i, j, k);
+        Exs(i, j, k) = Ex(i, j, k) + (de ? 0.5 * D / (1 + dv.cx(i, j, k)) : 0.5 * D) * sx;
         Bxs(i, j, k) = Bx(i, j, k) - 0.5 * D * ((Ez(i, j + 1, k) - Ez(i, j, k)) * iy -
                                                 (Ey(i, j, k + 1) - Ey(i, j, k)) * iz);
     };
@@ -91,6 +95,10 @@ void Fields::step_core(Comm& comm, const BoundaryHooks& hooks, double t) {
     if (side) side->fix_transport(nEy, nEz, nBy, nBz, 0);
     if (metal) metal_fix_transport(d_, metal->view(), nEy, nEz, nBy, nBz);
     { PROF_SCOPE("rip_cc.xchg T"); comm.exchange(d_, {&ney_, &nez_, &nby_, &nbz_}); }
+    if (de) {                                      // the polarization current of E_y, E_z: lines along x (decision 100)
+        diel->correct(comm, d_, *this, ney_, nez_, nby_, nbz_);
+        comm.exchange(d_, {&ney_, &nez_, &nby_, &nbz_});
+    }
 
     // 3. corrector with the time-centred transverse fields (this is what conserves charge)
     for_owned(d_, [=] HD(int i, int j, int k) {
@@ -98,7 +106,8 @@ void Fields::step_core(Comm& comm, const BoundaryHooks& hooks, double t) {
         const double by0 = 0.5 * (By(i, j, k) + nBy(i, j, k)), bym = 0.5 * (By(i, j, k - 1) + nBy(i, j, k - 1));
         const double ez0 = 0.5 * (Ez(i, j, k) + nEz(i, j, k)), ezp = 0.5 * (Ez(i, j + 1, k) + nEz(i, j + 1, k));
         const double ey0 = 0.5 * (Ey(i, j, k) + nEy(i, j, k)), eyp = 0.5 * (Ey(i, j, k + 1) + nEy(i, j, k + 1));
-        Ex(i, j, k) += D * ((bz0 - bzm) * iy - (by0 - bym) * iz - Jx(i, j, k));
+        const double sx = (bz0 - bzm) * iy - (by0 - bym) * iz - Jx(i, j, k);
+        Ex(i, j, k) += (de ? D / (1 + dv.cx(i, j, k)) : D) * sx;
         Bx(i, j, k) -= D * ((ezp - ez0) * iy - (eyp - ey0) * iz);
     });
     if (side) side->fix_corr(Ex, Bx);
@@ -110,10 +119,16 @@ void Fields::step_core(Comm& comm, const BoundaryHooks& hooks, double t) {
 double Fields::energy() const {
     const FV a = ex.view(), b = ey.view(), c = ez.view(), e = bx.view(), f = by.view(), g = bz.view();
     const int nx = d_.n[0], ny = d_.n[1];
+    const bool de = diel != nullptr;
+    const Diel3View dv = de ? diel->view() : Diel3View{};
     const double s = par_sum(d_.owned(), [=] HD(long q) {
         const int i = int(q % nx), j = int((q / nx) % ny), k = int(q / (long(nx) * ny));
         auto sq = [&](const FV& v) { return v(i, j, k) * v(i, j, k); };
-        return sq(a) + sq(b) + sq(c) + sq(e) + sq(f) + sq(g);
+        const double w = sq(a) + sq(b) + sq(c) + sq(e) + sq(f) + sq(g);
+        if (!de) return w;
+        // the dielectric: + E.P, P = chi E at E_x and at the J_y, J_z points (mu_x E there)
+        const double my = 0.5 * (b(i, j, k) + b(i + 1, j, k)), mz = 0.5 * (c(i, j, k) + c(i + 1, j, k));
+        return w + dv.cx(i, j, k) * sq(a) + dv.cy(i, j, k) * my * my + dv.cz(i, j, k) * mz * mz;
     });
     return 0.5 * s * d_.cell_volume();
 }
@@ -138,6 +153,7 @@ void Fields::check_range(int lo[3], int hi[3]) const {
             lo[0] = std::max(0, xabs.cells + 1 - d_.off[0]);
             hi[0] = std::min(d_.n[0], d_.N[0] - xabs.cells - 1 - d_.off[0]);
         }
+        if (a == 0 && dfront > 0) hi[0] = std::min(hi[0], d_.N[0] - dfront - 1 - d_.off[0]);   // the dielectric front layer
     }
 }
 
@@ -176,9 +192,18 @@ void Fields::gauss_residual(Field& out) const {
     check_range(lo, hi);
     const bool me = metal != nullptr;
     const Metal3View mv = me ? metal->view() : Metal3View{};
+    const bool de = diel != nullptr;
+    const Diel3View dv = de ? diel->view() : Diel3View{};
     for_owned(d_, [=] HD(int i, int j, int k) {
         if (i >= iend || i < lo[0] || i >= hi[0] || j < lo[1] || j >= hi[1] || k < lo[2] || k >= hi[2]) { O(i, j, k) = 0; return; }
         if (me && mv.gauss_skip(i, j, k)) { O(i, j, k) = 0; return; }   // the surface charge of the metal (metal3d.hpp)
+        if (de) {                                 // dielectric: div D, D = (1 + chi) E at E_x and at the J_y, J_z points
+            auto Dy = [&](int jj) { return 0.5 * (1 + dv.cy(i, jj, k)) * (Ey(i, jj, k) + Ey(i + 1, jj, k)); };
+            auto Dz = [&](int kk) { return 0.5 * (1 + dv.cz(i, j, kk)) * (Ez(i, j, kk) + Ez(i + 1, j, kk)); };
+            O(i, j, k) = ((1 + dv.cx(i + 1, j, k)) * Ex(i + 1, j, k) - (1 + dv.cx(i, j, k)) * Ex(i, j, k)) * ix +
+                         (Dy(j) - Dy(j - 1)) * iy + (Dz(k) - Dz(k - 1)) * iz - R(i, j, k);
+            return;
+        }
         O(i, j, k) = (Ex(i + 1, j, k) - Ex(i, j, k)) * ix +
                      0.5 * (Ey(i, j, k) + Ey(i + 1, j, k) - Ey(i, j - 1, k) - Ey(i + 1, j - 1, k)) * iy +
                      0.5 * (Ez(i, j, k) + Ez(i + 1, j, k) - Ez(i, j, k - 1) - Ez(i + 1, j, k - 1)) * iz - R(i, j, k);

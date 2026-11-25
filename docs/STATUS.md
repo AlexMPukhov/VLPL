@@ -142,6 +142,9 @@ Updated: 2026-11-14 (Phase 3: binary collisions and impact ionization, decision 
   `rings.jacket` (2026-11-12, decision 83 amended): a solid tube r_out .. r_out + jacket over the stack closes the gaps: the
   closed corrugated pipe with a real open end at z_end (per-point metal rules, bit-identical without a jacket; M7, M3 with a
   jacket, tests/mpi.sh).
+- Generic dielectrics (decision 100, 2026-11-24, branch generic-dielectric; Alexander: "dielectrics and metals have to be
+  implemented in general"): RZ with the block metal (lines on the angles, P6-P8), eps from a deck expression (D7-D9), eps
+  depending on phi (chi on the angles, D10-D11), and Cart3D / 2D (docs/specs/dielectric3d.md, E1-E4); tests/mpi.sh cases.
 - RZ dielectric regions (decision 100, `docs/specs/rz_dielectric.md`, blocks `dielectric`, 2026-11-13): eps(r, z) rectangles in the
   explicit RIP-CC step as a time-centred polarization current (a tridiagonal line along z per radial row, partitioned across the
   ranks), stable and lossless for any eps, div D = rho at round-off, together with the rings (dielectric in the gaps), MPI and

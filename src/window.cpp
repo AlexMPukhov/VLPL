@@ -83,6 +83,11 @@ void Simulation::shift_window() {
     ++dom.wx;
     if (metal3) metal3->shift(dom, work_);          // the lab-fixed metal: the mask moves, the new column from the function
     { PROF_SCOPE("window.xchg fields"); comm.exchange_x(dom, {&f.ex, &f.ey, &f.ez, &f.bx, &f.by, &f.bz}); }   // y, z guards moved with the data
+    if (diel3) {                                   // dielectric (decision 100): chi moves with the window; E_x of the entering
+        diel3->shift(dom, work_);                  // column and the front layer from div D (RIP-CC)
+        if (dom.solver == Solver::RipCC && dom.off[0] + dom.n[0] == dom.N[0]) dielectric3_window_entry(f, dom, gauss0_, f.dfront, *diel3);
+        comm.exchange(dom, {&f.ex});
+    }
     Field* rhom = nullptr;
     if (medium) {                                  // O7: the media state moves too; their charge enters the iRIP entry cell
         shift_window_medium();

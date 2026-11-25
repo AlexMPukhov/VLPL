@@ -360,13 +360,17 @@ rings     { r_in, r_out, period, gap, z_start, z_end, jacket }   # embedded perf
                                      # (closed corrugated pipe with an open end at z_end); one convenience geometry: conductors
                                      # of any shape (also axisymmetric) with the block metal below
 dielectric [<name>] { r_in, r_out, z_start, z_end, eps, ramp }   # lossless dielectric eps(r, z), rectangles fixed in the lab frame,
+                                     # or eps = <expression of x, y, z, r, phi with units> (e.g. 1 + 1.5 * (1 - (r / 0.5 mm)^2);
+                                     # with x, y or phi chi lives on the 2M - 1 angles),
+                                     # then the rectangle keys are an optional bounding box; sampled 8 x 8 per control volume,
                                      # chi = eps - 1 added; metal wins; time-centred polarization current (a tridiagonal line
                                      # along z per row, stable and lossless for any eps), div D = rho at round-off; cut cells
                                      # sub-cell averaged; ramp: linear z ends; with a moving window the last 32 cells at the front
                                      # edge absorb (keep beams behind them); rip_cc only (docs/specs/rz_dielectric.md, decision 100)
                                      # (a warning, at the start and during the run, when charged particles are inside it);
-                                     # several blocks combine (any union of rectangles); with metal: only the rings block so far
-                                     # (not the metal block); examples bench/rz_dielectric/dwa.deck (a lined tube, the wall the
+                                     # several blocks combine (any union of rectangles); with metal: the rings block or the
+                                     # metal block (also depending on phi: the lines solved on the 2M - 1 angles);
+                                     # examples bench/rz_dielectric/dwa.deck (a lined tube, the wall the
                                      # grid edge), cherenkov.deck
 metal     { function, phi_derivative = difference|spectral, enabled = true }   # RZ: conductors that depend on the azimuth:
                                      # metal where function(x, y, z, r, phi) > 0 (lab frame, also with the window), on the
@@ -407,6 +411,13 @@ inside external quadrupoles, with the wake diagnostics. Files written for z-prop
 metal     { function = f(x, y, z) }  # perfect conductor where f > 0 (absolute coordinates, lab-fixed, also with the window):
                                      # staircase on the RIP-CC grid (tangential E = 0, total reflection at x faces through the
                                      # RIP transport, the Gauss law exact off the surface), particles inside absorbed; rip_cc only
+dielectric [<name>] { eps }          # lossless dielectric, Cart3D and 2D (docs/specs/dielectric3d.md, decision 100): eps a number
+                                     # (everywhere) or an expression of x, y, z (lab frame, units), blocks add their eps - 1;
+                                     # time-centred polarization current (lines along x, ranks along x by a partition solve),
+                                     # stable and lossless for any eps, div D = rho at round-off; chi per component from 4^3
+                                     # sub-samples (harmonic along its direction); with the metal block; CPML; with a moving
+                                     # window the last 32 cells at the front edge absorb (a warning for charged particles in them);
+                                     # rip_cc only, no side tube, no boosted frame
 quadrupole <name> { x_start, length, gradient [T/m], y_center, z_center }   # hard-edged, on the particles only:
                                      # B_y = -G (z - z_c), B_z = -G (y - y_c) (G > 0 focuses electrons in y); averaged over the
                                      # x crossed during the kick, so edges between the grid points are exact
@@ -567,10 +578,17 @@ a laser wake against the uniform fine grid (tests/test_rz_grid.cpp).
   Gauss law off the metal surface 1e-15, div B 1e-16, particles absorbed by the metal; the RZ self-field of a gamma = 10
   beam: Gauss law 2e-13 of max rho at the init, its field energy constant to 2e-3 over 10 fs; a u = 1e4 beam in a moving
   window from t = 0: Gauss law 2e-14 (decision 95); iRIP with rings rejected.
+- Dielectrics in Cart3D / 2D (tests/test_dielectric3d.cpp, `build/tests test_dielectric3d`, decision 100): smooth random fields
+  with a sphere and a tilted slab: div D unchanged to 5e-15, energy within 1 %; normal incidence on eps 4 (3D, 2D, both
+  polarizations): reflected -1/3 to 4e-16, transmitted 2/3 to the grid dispersion (1.5e-4 at 40 cells per pulse width);
+  oblique 30 deg: p 8e-3, s 6e-4 from Fresnel; 2D moving window with a lining: Gauss 7e-13, no growth, the front-layer warning.
 - RZ dielectric blocks (tests/test_rz_dielectric.cpp, `build/tests test_rz_dielectric`, decision 100): div D unchanged to 1e-14 with
   partial cells (eps 1.7, 3); TM01 in a filled tube against the scheme's own dispersion relation (eps 1.1 ... 4, within 0.5 %);
-  eps = 1 bit for bit; plasma + rings + gaps + collar: div D - rho 6e-16; a moving window with eps 3.8 and a bunch: Gauss 7e-13,
-  no growth at the front edge. Benchmarks in bench/rz_dielectric/ (DWA, Cherenkov cone, thin wall).
+  eps = 1 bit for bit; plasma + collar + rod with rings, without metal and with the metal block (phi ridges): div D - rho
+  6e-16 ... 1.2e-15; a moving window with eps 3.8 and a bunch: Gauss 7e-13, no growth at the front edge. With the metal block
+  (tests/test_rz_metal_phi.cpp P6-P8): an axisymmetric metal function + dielectric = rings + dielectric to 4e-15; a square
+  guide filled with eps: sqrt(eps) k_c = the vacuum k_c to 3e-9; a corrugated square pipe with dielectric, 3000 steps:
+  energy bounded, div D unchanged to 7e-15. Benchmarks in bench/rz_dielectric/ (DWA, Cherenkov cone, thin wall).
 - Field ionization (tests/test_ionization.cpp, `build/tests test_ionization`, decision 86): ADK of I = 1/2 Hartree = the Landau
   rate (6e-16), the code tables = the SI formula (4e-15) = the independent Python implementation tools/ionization_ref.py
   (3e-11), the cap beyond the peak; the Monte Carlo in a constant field: H against exp(-w t) and Ar0..Ar4+ at w dt = 2.3, 0.5

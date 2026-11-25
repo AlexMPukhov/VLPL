@@ -49,6 +49,7 @@ void test_rz_metal_phi(Comm& comm);       // tests/test_rz_metal_phi.cpp (RZ met
 void test_structure(Comm& comm);           // tests/test_structure.cpp (Cart3D metal, quadrupoles, beam files, wake diagnostics)
 void test_rz_structure(Comm& comm);        // tests/test_rz_structure.cpp (RZ quadrupoles, beam files, wake probe, slices; decision 105)
 void test_rz_dielectric(Comm& comm);        // tests/test_rz_dielectric.cpp (RZ dielectric blocks, RIP-CC, decision 100)
+void test_dielectric3d(Comm& comm);         // tests/test_dielectric3d.cpp (Cart3D / 2D dielectric, RIP-CC, decision 100)
 void test_medium(Comm& comm);              // tests/test_medium.cpp (O7 linear media)
 void test_medium2(Comm& comm);             // tests/test_medium2.cpp (O7: deck, particles, RZ, parabolic mirror)
 void test_bound(Comm& comm);               // tests/test_bound.cpp (O7 model = bound: Maxwell-Bloch atoms, decision 85)
