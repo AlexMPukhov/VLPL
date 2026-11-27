@@ -108,8 +108,9 @@ public:
         std::vector<Species*> v;
         for (auto& sp : s.species) {
             if (rm) { double n = 0; sp.lost_charge += rz_absorber_count(sp, rwall, n); sp.lost_count += n; }
-            if (s.rz->metal) rz_metal_remove(sp, *s.rz, rwall, s.cfg.order);   // particles inside the rings
-            if (s.rz->metal_phi) rz_metal_phi_remove(sp, *s.rz, *s.rz->metal_phi, rwall, s.cfg.order);   // block metal
+            // particles = absorb of the blocks rings / metal (default pass: they cross the metal, decision 122)
+            if (s.rz->metal && s.cfg.rings.absorb) rz_metal_remove(sp, *s.rz, rwall, s.cfg.order);
+            if (s.rz->metal_phi && s.cfg.metal_rz.absorb) rz_metal_phi_remove(sp, *s.rz, *s.rz->metal_phi, rwall, s.cfg.order);
             v.push_back(&sp);
         }
         migrate(v, s.dom, s.comm, rwall);              // all species in one message per direction

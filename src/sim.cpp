@@ -284,6 +284,7 @@ Config Config::from_deck(const Deck& d) {
         c.rings.z_start = d.num("rings", "z_start", Kind::Length) * k0;
         c.rings.z_end = d.num("rings", "z_end", Kind::Length) * k0;
         c.rings.jacket = d.num("rings", "jacket", Kind::Length, 0.0) * k0;   // closed corrugated pipe, open end at z_end
+        c.rings.absorb = metal_particles_absorb(d, "rings");
     }
     if (c.rz && d.has_block("metal")) {             // conductors depending on phi in RZ (rz_metal_phi.md; Cart3D: structure.cpp)
         std::string t = d.str("metal", "function");
@@ -295,9 +296,33 @@ Config Config::from_deck(const Deck& d) {
         const std::string pd = d.str("metal", "phi_derivative", "difference");
         if (pd != "difference" && pd != "spectral") throw std::runtime_error("metal.phi_derivative: difference or spectral");
         c.metal_rz.spectral = pd == "spectral";
+        c.metal_rz.absorb = metal_particles_absorb(d, "metal");
         c.metal_rz.on = d.flag("metal", "enabled", true);   // the keys are read (and checked) also when disabled
     }
     if (c.metal_rz.on && c.rings.on) throw std::runtime_error("RZ: the metal block and the rings block cannot be combined");
+    if (c.rz && c.solver == Solver::IRip && (c.rings.on || c.metal_rz.on)) {   // decision 124: the conductor as a Drude medium
+        const UnitFn u = [k0](const std::string& n, double& f) { return unit_to_code(n, k0, f); };
+        MediumConfig m = metal_medium(d, c.rings.on ? "rings" : "metal", c.dt());
+        if (c.rings.on) {                            // the rings (and the jacket) as an expression of z, r (code units)
+            const RingsConfig& R = c.rings;
+            if (!(R.period > 0) || R.gap < 0 || R.gap >= R.period) throw std::runtime_error("rings: period > 0 and 0 <= gap < period");
+            char t[640];
+            std::snprintf(t, sizeof t,
+                          "z >= %.17g && z < %.17g && ((r > %.17g && r < %.17g && (z - %.17g) - %.17g * floor((z - %.17g) / %.17g) < %.17g)"
+                          " || (r >= %.17g && r < %.17g))",
+                          R.z_start, R.z_end, R.r_in, R.r_out, R.z_start, R.period, R.z_start, R.period,
+                          R.gap == 0 ? 2 * R.period : R.period - R.gap, R.r_out, R.r_out + R.jacket);
+            m.profile = Expr(t, {"z", "r"}, u);
+        } else {                                     // one coefficient for all modes: an axisymmetric function only
+            try { m.profile = Expr("(" + c.metal_rz.text + ") > 0", {"z", "r"}, u); }
+            catch (const std::exception& ex) {
+                throw std::runtime_error(std::string("metal.function with numerics.solver = irip: a function of z and r only (the medium "
+                                                     "is axisymmetric, decision 124): ") + ex.what());
+            }
+        }
+        c.media.push_back(m);
+        c.rings.on = false; c.metal_rz.on = false;
+    }
     for (const std::string& b : d.block_names()) {   // dielectric regions in RZ (rz_dielectric.hpp, decision 100)
         if (b != "dielectric" && b.rfind("dielectric ", 0) != 0) continue;
         if (!d.flag(b, "enabled", true)) continue;
@@ -482,6 +507,15 @@ Config Config::from_deck(const Deck& d) {
         W.v = d.num("window", "velocity", Kind::None, 1.0);
     }
     for (const std::string& b : d.block_names()) {
+        if (b.rfind("bunch ", 0) == 0) {             // a Gaussian bunch without a file (src/structure.cpp)
+            SpeciesConfig s;
+            s.name = b.substr(6);
+            for (const SpeciesConfig& o : c.species)
+                if (o.name == s.name) throw std::runtime_error(b + ": a species of this name exists already");
+            species_bunch_from_deck(d, b, c, s, k0);
+            c.species.push_back(s);
+            continue;
+        }
         if (b.rfind("species ", 0) != 0) continue;
         SpeciesConfig s;
         s.name = b.substr(8);
@@ -500,7 +534,7 @@ Config Config::from_deck(const Deck& d) {
             continue;
         }
         species_charge(d, b, s);
-        s.density = d.num(b, "density", Kind::None);
+        s.density = d.num(b, "density", Kind::Density);
         if (c.rz) {
             // particle axes (z, x, y); positions bounded in z and r, regular in (z, r, theta) per cell
             const char* pa[3] = {"z", "x", "y"};
@@ -695,7 +729,7 @@ void Config::check() const {
     const double cour = D * D * (1 / (h[1] * h[1]) + (flat ? 0.0 : 1 / (h[2] * h[2])));   // 2D: no z term (d/dz = 0)
     double wp2 = 0;
     for (auto& s : species)
-        if (!frozen(s)) wp2 += s.density * s.q2() / s.m + s.wp2_electrons();   // frozen: no current
+        if (!frozen(s)) wp2 += check_density_factor(s) * (s.density * s.q2() / s.m + s.wp2_electrons());   // frozen: no current
     bool laser = !file_lasers.empty();
     for (const LaserConfig& L : all_lasers()) laser = laser || L.enabled;
     // self_field (docs/specs/beam_self_field.md): with iRIP the discrete RIP-CC equilibrium (iRIP keeps the same Gauss
@@ -835,7 +869,7 @@ void Config::check_rz() const {
     }
     double wp2 = 0;
     for (auto& s : species)
-        if (!frozen(s)) wp2 += s.density * s.q2() / s.m + s.wp2_electrons();   // frozen: no current (collisions.hpp)
+        if (!frozen(s)) wp2 += check_density_factor(s) * (s.density * s.q2() / s.m + s.wp2_electrons());   // frozen: no current (collisions.hpp)
     const double D = h[0];
     if (solver == Solver::Yee) throw std::runtime_error("geometry = rz: numerics.solver = rip_cc or irip");
     if (solver == Solver::IRip) {
@@ -1266,7 +1300,7 @@ Simulation::Simulation(const Config& c, Comm& cm) : cfg(c), comm(cm) {
         pipeline.add(std::make_unique<FieldStep>());
     }
     if (medium && medium->bc.ion) pipeline.add(make_medium_ionize_operator());   // O7 bound: electron-ion pairs (before the migration)
-    if (metal3) pipeline.add(make_metal_absorb_operator());   // particles that entered the metal (metal3d.hpp)
+    if ((metal3 || metal_mask_) && cfg.metal.absorb) pipeline.add(make_metal_absorb_operator());   // metal.particles = absorb (metal3d.hpp)
     if (diel3 && fields->dfront > 0) pipeline.add(make_front_layer_watch());   // dielectric + window (decision 100)
     pipeline.add(std::make_unique<Migrate>());
     tiles = tile_grid(dom, c.tile);
@@ -1421,7 +1455,7 @@ void Simulation::check_peak_density() {
         const SpeciesConfig& s = cfg.species[i];
         const double f = loaded[i] ? comm.allreduce_max(peak_[i]) : 1.0;
         if (cfg.frozen(s)) continue;                 // a frozen species of a collisions block carries no current
-        wp2 += s.density * f * s.q2() / s.m + f * s.wp2_electrons();
+        wp2 += f * cfg.check_density_factor(s) * (s.density * s.q2() / s.m + s.wp2_electrons());
     }
     bool ramp = false;
     for (const SpeciesConfig& s : cfg.species) ramp = ramp || s.slab_ramp > 0 || s.slab_rear_ramp > 0;
@@ -1509,6 +1543,10 @@ void Simulation::write_slices() {
 void Simulation::compute_rho() {
     fields->rho.fill(0);
     for (auto& s : species) deposit_rho(s, fields->rho, dom, cfg.order);
+    if (rho_abs_.n(0) > 0) {                       // the charge absorbed in a medium metal, at rest (structure.cpp, decision 124)
+        const FV R = fields->rho.view(), A = rho_abs_.view();
+        par_for(long(rho_abs_.size()), [=] HD(long q) { R.p[q] += A.p[q]; });
+    }
     comm.add_guards(dom, {&fields->rho});
     if (cfg.filter_passes > 0) filter_rho_cart(fields->rho, filt_, dom, comm, cfg.filter_passes);   // the charge of the filtered current
     if (medium) {                                  // O7: the polarization charge -div P of the media
@@ -1641,12 +1679,13 @@ void Simulation::init(const std::string& restart) {
     }
     if (fields->side) side_setup(restart.empty());
     if (restart.empty()) {
-        if (metal3) {                              // no field and no particle inside the metal at the start (metal3d.hpp)
+        if (metal3) {                              // no field inside the metal at the start; particles = absorb: no particle (metal3d.hpp)
             Fields& f = *fields;
             metal_zero_fields(dom, metal3->view(), f.ex.view(), f.ey.view(), f.ez.view(), f.bx.view(), f.by.view(), f.bz.view());
             comm.exchange(dom, {&f.ex, &f.ey, &f.ez, &f.bx, &f.by, &f.bz});
-            metal_absorb_all();
+            if (cfg.metal.absorb) metal_absorb_all();
         }
+        if (metal_mask_) metal_absorb_all();        // irip: no particle inside the medium metal at the start; its charge stays
         check_peak_density();
         if (sort_every > 0)
             for (auto& s : species) sort_by_tile(s, dom, tiles);

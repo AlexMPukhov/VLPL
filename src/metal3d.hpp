@@ -20,9 +20,11 @@
 // The Gauss law changes only at the rho points whose stencil touches a metal point (the surface charge): the checks skip
 // (i+1/2, j, k) with any metal node in i..i+1, j-1..j+1, k-1..k+1, and the div B points (i+1/2, j+1/2, k+1/2) with any
 // metal node in i..i+1, j..j+1, k..k+1.
-// Particles whose shape lies inside the metal (every node of the box around them metal) are absorbed: weight 0 and
-// momentum 0 (no charge, no current afterwards; their kinetic energy goes to Species::lost_energy), so the Gauss law at
-// the checked points stays exact.
+// Particles (metal.particles, decision 122): pass (the default): they cross the metal; the fields at the metal points are 0, so
+// they move on straight lines there, and their charge and current inside touch only skipped Gauss points (entry and exit
+// radiate: transition radiation). absorb: a particle whose shape lies inside the metal (every node of the box around it
+// metal) is removed (its kinetic energy goes to Species::lost_energy); the charge it carried in stays on the conductor
+// as surface charge. The Gauss law at the checked points stays exact in both modes.
 #pragma once
 #include <string>
 #include "expr.hpp"
@@ -33,6 +35,11 @@ class Species;
 struct Metal3Config {
     bool on = false;
     Expr fn;                                 // metal(x, y, z) > 0 inside (code units, absolute positions)
+    bool absorb = false;                     // metal.particles = absorb (default pass: particles cross the metal, decision 122)
+    // numerics.solver = irip (decision 124): the conductor is a Drude medium block named metal (Config::media) with the profile
+    // function > 0; `on` is then false (no staircase conductor), density = n / n_c (default: omega_p dt = 10), nu / omega0
+    bool medium = false;
+    double density = 0, nu = 0;
 };
 
 // The plain view the kernels capture: the node mask (0 / 1 as double, the layout of the fields, guards valid)
@@ -85,4 +92,6 @@ void metal_fix_corr(const Domain& d, const Metal3View& mv, const FV Ex, const FV
 // every forced point of E, B to 0 (the face B too), owned cells and guards: the initial fields
 void metal_zero_fields(const Domain& d, const Metal3View& mv, const FV Ex, const FV Ey, const FV Ez, const FV Bx, const FV By, const FV Bz);
 // absorbs the particles inside the metal (weight and momentum 0); returns the kinetic energy removed, w m (gamma - 1)
-double metal_absorb(Species& sp, const Domain& d, const Metal3View& mv, int order);
+// remove = false: the particles are only flagged (removal_flags of species.hpp; the caller removes them with remove_flagged);
+// flagged: their number (local)
+double metal_absorb(Species& sp, const Domain& d, const Metal3View& mv, int order, bool remove = true, long* flagged = nullptr);

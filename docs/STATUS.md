@@ -3,6 +3,41 @@
 Updated: 2026-11-14 (Phase 3: binary collisions and impact ionization, decision 94; RZ metal depending on phi, block metal, and the axis cut numerics.rz_axis_cut, decision 103; structure runs in Cart3D: embedded metal, quadrupoles, openPMD beams, wake diagnostics, decision 102; Phase 1 exit benchmark: emittance of the Fig. 4 beam, `bench/emittance/`, decision 98; exact discrete steady-state self-field init for RIP-CC, the default, decision 99; LASY laser files in RZ, 2D and the boosted frame, decision 97; Breit-Wheeler pairs, decision 96; beam self-field clamped per mode, decision 95; Phase 4 started: spin-resolved QED, decision 93; current filter binomial by default and exact window entry, decision 91; field ionization in the boosted frame, decision 90; boosted-frame antenna, decision 89; boosted frame, decision 87; code renamed VLPL, formerly RIP-PIC, decision 88; Phase 3 started: field ionization, decision 86; O7 linear media and model = bound, decisions 84, 85; RZ embedded metal, decision 83). Phase 1 (production core) of `docs/ROADMAP.md`; Phase 0 done except multi-GPU.
 
 ## Works (tested)
+- RZ iRIP radial transform on the GPU (2026-11-27, branch irip-rz-gemm): a tiled kernel (64 x 64 outputs per block, j in
+  tiles of 16, src/rz_irip.cpp radial_transform) replaces the per-column loop in solve() and in the O5 closure; every output
+  keeps its j order, so results are bit-identical (diag.txt of 90 steps, nz x nr 600 x 2000 plain and 600 x 400 with
+  closure = o5). RTX 5090: rz_fields 200.7 -> 46.1 s (plain, nr = 2000), 165.3 -> 2.5 s (o5, nr = 400). Test: rz irip radial
+  transform = direct sum on shapes off the tiles (GPU 2.2e-16 relative). All CPU unit tests pass.
+- Metal blocks: `particles = pass | absorb` (decision 122, 2026-11-25, branch metal-particles; found by Oliver in a pair-production
+  run, switch asked for by Alexander): by default particles cross the blocks `metal` (Cart3D / 2D, RZ) and `rings` (no field
+  inside: straight lines); `absorb` removes them inside (really removed now) and the conductor keeps their charge. Tests S4, M3,
+  P5 in both modes at round-off in the Gauss law; S4b: bunch into an isolated plate, flux of E / absorbed charge - 1 = -2.8e-15
+  (absorb), plate neutral to 3.1e-17 of Q and <u_x> / u_0 - 1 = -5.0e-05 (pass). MPI suite (job 17875, 8 ranks, binaries of
+  8275150): 182 comparisons, mpi.sh exit 0; GPU (RTX 5090): the three metal test groups, 47 checks, 0 failures.
+  Metal blocks in irip (decision 124, branch metal-implicit): `metal` (Cart3D / 2D; RZ axisymmetric) and `rings` become a Drude
+  medium with omega_p dt = 10 (keys density, collision_frequency). Tests L9: |R - 1| 3.2e-12 at normal incidence, field energy
+  deeper than two cells <= 6.2e-13; hot plasma through a slab, Gauss 3.4e-15, 7680 of 7680 particles; RZ rings and metal
+  function, Gauss 7.3e-15. 1 vs 8 ranks (job 17920): slab with a streaming plasma, energies 9.4e-13, Gauss 1.4e-16; RZ rings
+  behind the glass, identical. All unit tests pass (two older tests that expected the rejection rewritten), regression 7 / 7.
+  `particles = absorb` in irip, Cart3D / 2D (2026-11-26): removed inside, the charge kept at rest (rho_abs_). Test L9e (job 17945,
+  binaries of 8124cf1): 3D Gauss 9.0e-15, electrons 3264 -> 2758, ions 3264 -> 3264, |sum rho| / (cells max |rho|) 6.2e-17; 2D
+  Gauss 3.7e-15, electrons 272 -> 230, 8.2e-17. 1 vs 8 ranks (job 17946, binaries of 33ad8d0): slab with a streaming plasma and
+  absorb, energies 2.6e-13, Gauss 1.3e-16, particles per species 24064 -> 14848 on both, GMRES 1446 / 1446. The same job: all
+  unit tests pass (689 checks, 0 failures), regression matches the references. Not yet for absorb in irip: a moving window and
+  RZ (both refused), GPU.
+  Restart with absorb (2026-11-26, job 18046, binaries of 5ff3f2a): the stored charge is kept on the owned cells and written as
+  `vlpl_metal_absorbed`; from the checkpoint of step 9 (of 18) on 8 ranks diag.txt is byte-identical to the uninterrupted run;
+  restarted on 1 and 3 ranks the energies agree to all printed digits (Gauss 1.3e-16, particles 24064 -> 14848). 1 vs 8 ranks
+  unchanged (2.6e-13, GMRES 1446 / 1446); 689 unit checks, 0 failures; regression matches. Bug of 8e18ba4 (in main with pull
+  request 175, fixed in 5ff3f2a): absorb in irip on several ranks hung, because a rank without absorbed particles skipped
+  the collective guard exchange (job 17954 ran into its 4 h limit).
+  Not yet: the GPU run of L9; the full mpi.sh on this branch (it passed on metal-particles).
+  The Drude medium requires iRIP (decision 123, Alexander 2026-11-25): the explicit step is unstable for p-polarization with a
+  density gradient (branch medium-explicit, not for merging). Open: the perfect conductor in the implicit solvers, a material
+  model (stopping, scattering, bremsstrahlung, pairs).
+- Boosted beams in the omega_p dt start-up checks (decision 120, 2026-11-24, branch boost-check-density; Alexander: "Yes, fix
+  and rerun"): a boosted beam counts with n gamma_b (1 - beta_b beta_beam), not its lab density (a gamma 1e4 beam at gamma_b 10
+  was checked 20x too dense and refused at omega_b' dt' = 1.875); plasma at rest and lab decks unchanged; test B11.
 - Agent skills (decision 119, 2026-11-24, branch agent-skill): `skills/vlpl-setup`, `skills/vlpl-simulation` (open Agent Skills
   format; docs/agent_skill.md, README "Agent skill"). After editing the README sections "Units" / "Deck" or a copied example run
   `sh tools/sync_skills.sh`; a new deck key that the skill should know is written as `block.key` in the skill files. Test
@@ -269,6 +304,18 @@ Updated: 2026-11-14 (Phase 3: binary collisions and impact ionization, decision 
   examples/rz_corrugated_pipe.deck against Bane-Stupakov (research/rz_structure/).
   Loss factor 8.09 vs 8.08 kV/pC/m, kick factor 2.31 vs 2.42 kV/pC/m/mm; open: the dipole reference k1 (decision 105) to be
   checked by Alexander, the wake far behind at longer structures.
+- Common input form of the VLPL family (2026-11-26, decision 125, branch deck-standard, docs/specs/deck_standard.md):
+  `;` and one-line blocks, keys in any case, a key twice = error, energies / emittances / densities with units, the
+  common names (grid.m_max, laser wavelength / tau_fwhm / z_focus, species charge with a unit) and the block
+  `bunch <name>` (Gaussian bunch without a file, drawn in portions of 2^18 on every rank). Job 18147 (epyc, binaries of
+  a46d7bf): tests/test_deck.cpp 7 of 8 checks (the eighth failed on a tolerance of the test: the charge of 200000
+  weights sums to 3.8e-12, limit was 1e-12; now 1e-10), all other unit tests and the regression pass;
+  examples/rz_bunch.deck: sigma 2.996 / 3.002 -> 3.1086 / 3.1140 um after 1 mm (free drift 3.1099 / 3.1155), eps_n
+  unchanged, E +0.0006 MeV with the conducting wall.
+  Beams from files are read block-wise too (BeamFileSource, 2^18 particles at a time; before, every rank read the whole
+  file): test S6b, a file of 600001 particles = the written beam to 3.6e-15, the resampling follows the cumulative
+  weight within 1 copy, portions = one call (job 18155, test binary of 533b633); whole suite and regression with the
+  import of 715d7d2 (job 18150): only the first version of S6b failed, on its own comparison.
 - 157 fast tests and the 4 checks of test_hfocus (`make test`, `build/tests <name>` for a subset), regression harness (`make regression`,
   7 decks), MPI test (`tests/mpi.sh`, run locally before every pull request; the hosted CI job only on demand,
   decision 47), CI on the self-hosted runner (decision 33).
@@ -551,6 +598,14 @@ sort, `src/tiles.*`) equal to round-off, bit-identical with `numerics.sort_every
   2 m c^2 only, x from the full spectrum) accepted by Alexander, 2026-11-11.
 
 ## Known problems
+- The radial absorbing layer of VLPL-RZ takes energy from a bunch (found 2026-11-26 in the chain test VLPL-RZ ->
+  GEM-PIC-RZ): a 10 pC, gamma 400, sigma 3 um
+  bunch drifting in vacuum loses 0.368 MeV per 3 mm in a box of R = 40 um; proportional to the charge (1 pC: 0.0368),
+  independent of the number of particles, the modes, dz, the solver (rip_cc, irip) and the position in the window;
+  0.026 MeV at R = 120 um; +0.004 MeV with `boundary_r = wall`. The layer removes the outer part of the field of the
+  bunch itself. The front boundary was tested and is not the cause. For a run whose result is the energy of a bunch:
+  `boundary_r = wall` or a wide box. Open: a layer that is transparent for the field of a bunch; Cartesian VLPL with
+  absorbing side boundaries probably does the same (Alexander), not measured.
 - Beam self-field init (bench/emittance, decisions 98, 99): VLPL-RZ has no steady init yet (RZ starts with the
   Gauss-law field; the numbers with decision 95 are in bench/emittance/README.md). The steady init leaves a field tail
   ahead of the beam of 8.5e-11 of max|E| at u = 1e4 (window from t = 0: Gauss drift 2.7e-12; Gauss-law init exactly 0).

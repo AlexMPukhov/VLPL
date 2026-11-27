@@ -328,6 +328,8 @@ void Writer::fields() {
             if (any) scalar_mesh("rippic_pml_" + pa.first, *pa.second, o, 1.0, dim_0, 0, 1);
         }
         for (auto& ma : medium_arrays(s_.medium.get())) component(meshes_.get(), "vlpl_medium_" + ma.first, *ma.second, 0);
+        // the charge absorbed by a medium metal, at rest (irip with metal.particles = absorb, decision 124)
+        if (s_.rho_abs_.n(0) > 0) component(meshes_.get(), "vlpl_metal_absorbed", s_.rho_abs_, 0);
         // the cold fluid of a side tube in a background plasma: j^{n-1/2} at the points of J (side.hpp)
         const Field* Jf[3] = {&F.jfx, &F.jfy, &F.jfz};
         const char* jn[3] = {"rippic_fluid_jx", "rippic_fluid_jy", "rippic_fluid_jz"};
@@ -836,6 +838,12 @@ void read_checkpoint(Simulation& s, const std::string& path) {
     h5::Id me = h5::open_group(it, "meshes");
     if (s.cfg.rz) read_rz_fields(s, me);
     else read_fields(s, me);
+    if (s.rho_abs_.n(0) > 0) {                        // the charge absorbed by a medium metal (decision 124)
+        if (!h5::exists(me, "vlpl_metal_absorbed"))
+            throw std::runtime_error("checkpoint: no vlpl_metal_absorbed (written without metal.particles = absorb in irip, or "
+                                     "before the absorbed charge was stored)");
+        read_component(h5::open_dataset(me, "vlpl_metal_absorbed"), s.rho_abs_, d, 0);
+    }
     if (s.medium) {                                   // O7: the media state (medium_arrays), the dissipated energy, the statistics
         Medium& M = *s.medium;
         std::vector<Field*> ex;

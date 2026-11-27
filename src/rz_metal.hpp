@@ -15,6 +15,7 @@
 
 struct RingsConfig {
     bool on = false;
+    bool absorb = false;               // rings.particles = absorb (default pass, decision 122)
     double r_in = 0, r_out = 0, period = 0, gap = 0, z_start = 0, z_end = 0;   // code units
     double jacket = 0;                 // > 0: a solid tube r_out < r < r_out + jacket over [z_start, z_end] closes the gaps
                                        // (a closed corrugated pipe with an open end at z_end); 0: no jacket

@@ -179,6 +179,13 @@ struct Config {
             if (k.sp1 == s.name || k.sp2 == s.name) return true;
         return false;
     }
+    // the factor from the deck (lab) density to the density in the frame of the run, for the omega_p dt start-up checks
+    // (decision 120). A boosted beam (boost_kind 2) has n' = n gamma_b (1 - beta_b beta_beam) (lab velocity beta_beam; 0.050 n for
+    // a gamma 1e4 beam at gamma_b = 10). A plasma at rest in the lab (boost_kind 1) keeps its lab density n: its boosted density
+    // is gamma_b n, but the transverse response of the streaming plasma is n' / gamma_b = n (unchanged, decision 120).
+    double check_density_factor(const SpeciesConfig& s) const {
+        return boost.on && s.boost_kind == 2 ? boost.gamma * (1 - boost.beta * s.beam_v) : 1.0;
+    }
 
     static Config from_deck(const Deck& d);
     void summary(FILE* f, int ranks) const;
@@ -193,8 +200,13 @@ unsigned long long mix64(unsigned long long x);   // splitmix64 (seeds per cell)
 // structure runs (src/structure.cpp, docs/specs/structure3d.md)
 void structure_from_deck(const Deck& d, Config& c, double k0);
 void species_file_from_deck(const Deck& d, const std::string& b, const Config& c, SpeciesConfig& s, double k0);
+void species_bunch_from_deck(const Deck& d, const std::string& b, const Config& c, SpeciesConfig& s, double k0);
 void structure_summary(FILE* f, const Config& c);
 std::unique_ptr<Operator> make_metal_absorb_operator();
+// the key particles = pass (default) | absorb of the blocks metal and rings (decision 122): true for absorb
+bool metal_particles_absorb(const Deck& d, const std::string& block);
+// the block (metal, rings) of an irip run as a Drude medium, without its profile (src/structure.cpp, decision 124)
+MediumConfig metal_medium(const Deck& d, const std::string& block, double dt, bool absorb_ok = false);
 // grid.absorber_particles = remove (src/absorber_particles.cpp): Cart3D: the particles past the y/z PML faces (L[a] layer cells, 0: none)
 // are moved out of the box (migrate drops them); returns their charge q w Z, count = their number. RZ: the removal radius of the
 // radial absorber (cells layer cells) and the charge / number of the particles at r >= rrm. absorber_report: totals (collective).
@@ -313,6 +325,9 @@ public:
     RzTfsf* rz_tfsf() { return rz_tfsf_.get(); }   // RZ: the TFSF plane (null: none)
     // structure runs (src/structure.cpp): the metal, the quadrupole table, beams from files, the wake diagnostics
     std::unique_ptr<Metal3> metal3;              // block metal; null: none
+    std::unique_ptr<Metal3> metal_mask_;         // irip with metal.particles = absorb: the node mask of the medium metal (decision 124)
+    Field rho_abs_, absorb_tmp_, absorb_tmp2_;   // its absorbed charge at rest (owned cells, guards 0; added in compute_rho; in the
+                                                 // checkpoint as vlpl_metal_absorbed); scratch
     std::unique_ptr<Dielectric3> diel3;          // blocks dielectric in Cart3D / 2D; null: none
     void setup_structure();                      // in the constructor (after the fields)
     void load_file_species(size_t i);            // species.file

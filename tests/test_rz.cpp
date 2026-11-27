@@ -972,11 +972,51 @@ void rz_axis_crossing(Comm& comm) {
 }
 }  // namespace
 
+namespace {
+// The radial transform of iRIP (src/rz_irip.cpp; on the GPU a tiled kernel with 64 x 64 outputs per block and j in tiles of
+// 16) against the direct sum, on shapes that are no multiples of the tiles. Every output sums j = 0 .. nr - 1 in order, so
+// only the rounding of the multiply-adds (fused on the GPU) may differ from the host sum.
+void rz_radial_transform_check(Comm& comm) {
+    double err = 0;
+    const int shapes[3][3] = {{70, 37, 2}, {130, 129, 3}, {5, 17, 1}};          // nz, nr, modes
+    for (const auto& sh : shapes) {
+        const int nz = sh[0], nr = sh[1], M = sh[2];
+        Domain d = rz_domain(comm, nz, nr, M, 0.1, 0.1, true, Solver::IRip);
+        const int S = d.n[2];
+        std::mt19937_64 gen(7);
+        std::uniform_real_distribution<double> u(-1, 1);
+        std::vector<double> A(size_t(M) * nr * nr);
+        for (double& a : A) a = u(gen);
+        Field in(d), out(d);
+        std::vector<double> h = in.host();
+        for (int k = 0; k < S; ++k)
+            for (int j = 0; j < nr; ++j)
+                for (int i = 0; i < nz; ++i) h[in.idx(i, j, k)] = u(gen);
+        in.upload(h);
+        rz_radial_transform(A, in, out, nz, nr, S);
+        const std::vector<double> o = out.host();
+        for (int k = 0; k < S; ++k)
+            for (int a = 0; a < nr; ++a)
+                for (int i = 0; i < nz; ++i) {
+                    double s = 0, sa = 0;
+                    for (int j = 0; j < nr; ++j) {
+                        const double t = A[(size_t((k + 1) / 2) * nr + a) * nr + j] * h[in.idx(i, j, k)];
+                        s += t; sa += std::abs(t);
+                    }
+                    err = std::max(err, std::abs(o[out.idx(i, a, k)] - s) / sa);
+                }
+    }
+    check("rz irip: radial transform (tiled GPU kernel) = direct sum, nz x nr x slots 70 x 37 x 3, 130 x 129 x 5, 5 x 17 x 1",
+          err < 1e-14, [&] { char b[64]; std::snprintf(b, sizeof b, "max |out - sum| / sum |terms| = %.2e", err); return std::string(b); }());
+}
+}  // namespace
+
 void test_rz(Comm& comm) {
     if (comm.size > 1) return;                     // one rank so far (iRIP)
     rz_guided_irip(comm);
     rz_irip_random(comm);
     rz_o5(comm);
+    rz_radial_transform_check(comm);
     rz_ripcc(comm);
     rz_gather_uniform(comm);
     rz_plasma_gauss(comm);

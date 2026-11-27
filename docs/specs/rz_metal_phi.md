@@ -9,8 +9,8 @@ centred beam drives m = 0, 4, 8, .. and an offset beam m = 1, 3, 5, 7, ... The `
 ## Physics and equations
 Perfect conductor: tangential E = 0, normal B = 0 on its surface, all fields 0 inside; normal E and tangential B on the
 surface are the surface charge and current. The metal is given by a deck function, metal where f(x, y, z, r, phi) > 0
-(lab frame, fixed; z the axis, x = r cos phi, y = r sin phi in the RZ deck axes). Particles that enter the metal are
-absorbed.
+(lab frame, fixed; z the axis, x = r cos phi, y = r sin phi in the RZ deck axes). Particles cross the metal
+(`metal.particles = pass`, the default) or are absorbed (`absorb`), decision 122.
 
 ## Discretisation
 ### Angular grid

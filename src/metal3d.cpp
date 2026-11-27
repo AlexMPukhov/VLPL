@@ -115,39 +115,48 @@ void metal_zero_fields(const Domain& d, const Metal3View& mv, const FV Ex, const
     });
 }
 
-// A particle is inside when every node of the box [floor(r - s), ceil(r + s)] (s = (order + 1) / 2 cells, per axis) is
-// metal: its charge (rho at i + 1/2, shape <= order) and current then touch only skipped Gauss points.
-double metal_absorb(Species& sp, const Domain& d, const Metal3View& mv, int order) {
+// metal.particles = absorb. A particle is inside when every node of the box [floor(r - s), ceil(r + s)] (s = (order + 1) / 2
+// cells, per axis) is metal: its charge (rho at i + 1/2, shape <= order) and current then touch only skipped Gauss points.
+// It is removed from the species (remove_flagged, species.hpp); the charge it carried in stays on the conductor as surface
+// charge (the current up to there was deposited, and the field step conserves the charge: a floating conductor).
+// The mask is valid on all ng guard layers (Metal3::fill), so every particle this rank owns is decided here: the box
+// reaches at most ng - 1 cells beyond the owned ones (shape 2, ng = 3: n + 2); a particle further out has left the rank
+// and is decided by its new owner after the migration. 2D (flat): one z plane, no z test.
+double metal_absorb(Species& sp, const Domain& d, const Metal3View& mv, int order, bool remove, long* flagged) {
     const long n = long(sp.size());
+    if (flagged) *flagged = 0;
     if (n == 0) return 0;
-    double* X = sp.ptr<double>(Species::X);
-    double* Y = sp.ptr<double>(Species::Y);
-    double* Z = sp.ptr<double>(Species::Z);
-    double* UX = sp.ptr<double>(Species::UX);
-    double* UY = sp.ptr<double>(Species::UY);
-    double* UZ = sp.ptr<double>(Species::UZ);
-    double* W = sp.ptr<double>(Species::W);
+    const double* X = sp.ptr<double>(Species::X);
+    const double* Y = sp.ptr<double>(Species::Y);
+    const double* Z = sp.ptr<double>(Species::Z);
+    const double* UX = sp.ptr<double>(Species::UX);
+    const double* UY = sp.ptr<double>(Species::UY);
+    const double* UZ = sp.ptr<double>(Species::UZ);
+    const double* W = sp.ptr<double>(Species::W);
+    int* F = removal_flags(n);
     const double lo0 = d.lo(0), lo1 = d.lo(1), lo2 = d.lo(2), i0 = 1 / d.h[0], i1 = 1 / d.h[1], i2 = 1 / d.h[2];
     const double s = 0.5 * (order + 1), m = sp.m;
-    const bool flat = d.flat;
-    const int g = d.ng - 1, nx = d.n[0], ny = d.n[1], nz = d.n[2];
-    return par_sum(n, [=] HD(long p) {
-        if (W[p] == 0) return 0.0;
+    const bool flat = d.flat, photon = sp.photon;
+    const int g = d.ng, nx = d.n[0], ny = d.n[1], nz = d.n[2];
+    const double e = par_sum(n, [=] HD(long p) {
+        F[p] = 0;
         const double r[3] = {(X[p] - lo0) * i0, (Y[p] - lo1) * i1, (Z[p] - lo2) * i2};
         int a[3], b[3];
         const int lim[3] = {nx, ny, nz};
         for (int q = 0; q < 3; ++q) {
+            if (flat && q == 2) { a[2] = 0; b[2] = 0; continue; }
             a[q] = int(floor(r[q] - s)); b[q] = int(ceil(r[q] + s));
-            if (a[q] < -g || b[q] >= lim[q] + g) return 0.0;   // beyond the guards: decided by its owner
+            if (a[q] < -g || b[q] > lim[q] + g - 1) return 0.0;   // beyond the guards: decided by its owner
         }
-        if (flat) { a[2] = 0; b[2] = 0; }
         for (int k = a[2]; k <= b[2]; ++k)
             for (int j = a[1]; j <= b[1]; ++j)
                 for (int i = a[0]; i <= b[0]; ++i)
                     if (!mv.M(i, j, k)) return 0.0;
-        const double gm = sqrt(1 + UX[p] * UX[p] + UY[p] * UY[p] + UZ[p] * UZ[p]);
-        const double e = W[p] * m * (gm - 1);
-        W[p] = 0; UX[p] = 0; UY[p] = 0; UZ[p] = 0;
-        return e;
+        F[p] = 1;
+        const double u2 = UX[p] * UX[p] + UY[p] * UY[p] + UZ[p] * UZ[p];
+        return photon ? W[p] * sqrt(u2) : W[p] * m * u2 / (sqrt(1.0 + u2) + 1.0);   // photons: |u| (m_e c^2)
     });
+    if (flagged) *flagged = long(par_sum(n, [=] HD(long p) { return double(F[p]); }) + 0.5);
+    if (remove) remove_flagged(sp);
+    return e;
 }

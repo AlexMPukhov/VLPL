@@ -288,6 +288,9 @@ void rz_tm_basis(const RadialGrid& g, int m, std::vector<double>& V, std::vector
 // The eigenbasis of kind (0: TM on Ez, 1: TE on Bz) of mode m and the O5 spacing h_a^2 per radial mode (src/rz_irip.cpp)
 void rz_basis(const RadialGrid& g, int m, int kind, std::vector<double>& V, std::vector<double>& Vi, std::vector<double>& lam,
               std::vector<double>& h2);
+// out(i, a, k) = sum_j A_m[a][j] in(i, j, k) for i < nz, a < nr, k < S, A_m the nr x nr block m = (k + 1) / 2 of A
+// (row-major): the radial transform of iRIP (src/rz_irip.cpp, a tiled kernel on the GPU), for tests
+void rz_radial_transform(const std::vector<double>& A, const Field& in, Field& out, int nz, int nr, int S);
 void rz_filter_rho(FieldsRZ& f, Comm& comm, Field& rho, int passes);
 
 class Species;

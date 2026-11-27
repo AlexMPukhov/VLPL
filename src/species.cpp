@@ -318,6 +318,31 @@ long scan_flags(MigScratch& S, long n) {
 }
 }  // namespace
 
+// ---------------------------------------------------------------- removal of flagged particles (species.hpp)
+void remove_mark_holes(const int* F, const int* P, int* L, long n) {
+    par_for(n, [=] HD(long p) { if (F[p]) L[P[p]] = int(p); });
+}
+
+int* removal_flags(long n) {
+    MigScratch& M = mig_scratch();
+    grow(M.F, size_t(n));
+    return M.F.data();
+}
+
+long remove_flagged(Species& s) {
+    MigScratch& M = mig_scratch();
+    const long n = long(s.size());
+    if (n == 0) return 0;
+    grow(M.P, size_t(n));
+    const long m = scan_flags(M, n);
+    if (m == 0) return 0;
+    grow(M.L, size_t(m));
+    remove_mark_holes(M.F.data(), M.P.data(), M.L.data(), n);
+    migrate_fill(s.table(), M.F.data(), M.P.data(), M.L.data(), n, m);
+    s.resize(size_t(n - m));
+    return m;
+}
+
 // w m (gamma - 1) of a row (the core attributes X, Y, Z, UX, UY, UZ, W are its first F64)
 static double row_kinetic(const unsigned char* v, double m, bool photon) {   // photon: the energy |u| (m_e c^2)
     double u[3], w;

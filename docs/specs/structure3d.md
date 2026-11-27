@@ -13,7 +13,7 @@ written for z-propagating codes (GEM-PIC-RZ, elegant, openPMD beams) are mapped 
 ### Physics
 Perfect conductor: tangential E = 0, normal B = 0 on the surface, all fields 0 inside; the normal E and the tangential B
 on the surface are the surface charge and current. The metal is fixed in the lab frame (it moves through a moving
-window). Particles that enter the metal are absorbed.
+window). Particles cross the metal (`metal.particles = pass`, the default) or are absorbed in it (`absorb`), decision 122.
 
 ### Discretisation (staircase, src/metal3d.*)
 The transverse plane of RIP-CC is a 2D Yee lattice (src/grid.hpp): Ex on nodes (j, k), Ey / Bz on y edges (j + 1/2, k),
@@ -38,10 +38,15 @@ Ez / By on z edges (j, k + 1/2), Bx on faces (j + 1/2, k + 1/2); all at integer 
   metal points changes the Gauss residual only at the rho points whose stencil holds such a point (the surface charge).
   The checks skip (i + 1/2, j, k) with any metal node in i..i+1, j-1..j+1, k-1..k+1 and the div B points with any metal
   node in i..i+1, j..j+1, k..k+1; every other point keeps its residual to round-off.
-- **Particles.** After the move (stage Migrate, before the migration) a particle whose box [floor(r - s), ceil(r + s)]
-  (s = (order + 1)/2 cells per axis) holds only metal nodes is absorbed: weight and momentum 0, its kinetic energy added
-  to `Species::lost_energy`. Its current up to there was deposited, its charge afterwards is 0 at skipped points only.
-  Also at the start (particles loaded inside the metal).
+- **Particles** (`metal.particles`, decision 122). `pass` (default): nothing is done; the fields at the metal points are 0, so a
+  particle inside moves on a straight line, and its charge and current there touch only skipped Gauss points. Entry and
+  exit change the surface charge: transition radiation. Slow particles cross a wall as well (a real wall stops electrons
+  below ~100 keV per 10 um of gold): use `absorb` where the wall is a sink. `absorb`: after the move (stage Migrate, before
+  the migration) a particle whose box [floor(r - s), ceil(r + s)] (s = (order + 1)/2 cells per axis) holds only metal nodes
+  is removed from the species (`remove_flagged`, src/species.cpp), its kinetic energy added to `Species::lost_energy`
+  (photons: w |u|); also at the start (particles loaded inside the metal). Its current up to there was deposited and the
+  field step conserves charge, so the conductor keeps the charge as surface charge (a floating conductor: the flux of E
+  out of a box around it equals the absorbed charge, test S4b). The Gauss law at the checked points is exact in both modes.
 - **Initial fields** (laser, beam self-field) are set to 0 at the forced points before the run starts. The self-field of a
   beam ignores the metal: start the beam in vacuum ahead of the structure.
 - **Cost.** Three extra passes over the cells per step that read one mask value per cell (the rules read neighbours only
@@ -176,8 +181,10 @@ Tests (tests/test_rz_structure.cpp, `build/tests test_rz_structure`):
   Lam = (2/hy)^2 sin^2(m pi hy/2a) + (2/hz)^2 sin^2(n pi hz/2b): exact.
 - S2 Round pipe R (staircase), kx = 0: TM01 and TE11 cutoffs against j01 / R and j'11 / R at R / h = 8, 16, 32.
 - S3 Normal incidence on the x faces of a slab, both polarizations, both faces: the mirror image to round-off.
-- S4 Hot plasma in a corrugated tube, moving window, with and without CPML: Gauss law and div B at round-off,
-  particles absorbed.
+- S4 Hot plasma in a corrugated tube, moving window, with and without CPML: Gauss law and div B at round-off, with
+  particles = absorb and pass.
+- S4b A cold bunch into an isolated plate: absorb: all removed, flux of E around the plate = the absorbed charge; pass:
+  none lost, the plate neutral again, <u_x> kept.
 - S5 Cold electrons through a FODO (edges between the grid points) against thick-lens matrices, second order in h.
 - S6 A beam written as openPMD in the test (unitSI, positionOffset, macroWeighted, constant records) imported: Q,
   centroid, rms length, eps_n, <gamma> = the moments of the written particles; resampled within noise.

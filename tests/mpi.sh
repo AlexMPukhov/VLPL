@@ -697,6 +697,45 @@ compare mpi_rbw_1/diag.txt mpi_rbw_$NP/diag.txt " (O7 model = bound, moving wind
 mcompare mpi_rbw_1/medium.txt mpi_rbw_$NP/medium.txt " (O7 model = bound, moving window: medium.txt)"
 compare mpi_rzrbw_1/diag.txt mpi_rzrbw_$NP/diag.txt " (O7 model = bound in RZ, moving window: Rb with ionization, $NP ranks along z)"
 mcompare mpi_rzrbw_1/medium.txt mpi_rzrbw_$NP/medium.txt " (O7 model = bound in RZ, moving window: medium.txt)"
+# Metal blocks in irip (decision 124): the conductor as a Drude medium with omega_p dt = 10. The streaming plasma through a metal
+# slab (3D, NP ranks) and the laser of rz_medium.deck onto a stack of rings behind the glass (RZ, ranks along z).
+for np in 1 $NP; do
+    $MPIRUN -np $np $EXE $D numerics.solver=irip numerics.shape=2 numerics.medium_tol=1e-13 grid.ny=8 grid.nz=8 grid.dy=0.25um grid.dz=0.25um \
+        grid.t_end=60fs output.every=6 "species electrons.uth_y=0.3" "species electrons.uth_z=0.3" \
+        "metal.function=(x - 20 um) * (41 um - x)" output.dir=mpi_imet_$np > /dev/null
+    $MPIRUN -np $np $EXE $D numerics.solver=irip numerics.shape=2 numerics.medium_tol=1e-13 grid.ny=8 grid.nz=8 grid.dy=0.25um grid.dz=0.25um \
+        grid.t_end=60fs output.every=6 "species electrons.uth_y=0.3" "species electrons.uth_z=0.3" \
+        "metal.function=(x - 20 um) * (41 um - x)" metal.particles=absorb output.dir=mpi_imeta_$np > /dev/null
+    $MPIRUN -np $np $EXE examples/rz_medium.deck grid.t_end=70fs numerics.medium_tol=1e-13 output.every=40 rings.r_in=1um rings.r_out=3um \
+        rings.period=2um rings.gap=1um rings.z_start=10um rings.z_end=15um output.dir=mpi_rzmet_$np > /dev/null
+done
+compare mpi_imet_1/diag.txt mpi_imet_$NP/diag.txt " (metal slab in irip, streaming plasma through it, $NP ranks)"
+mcompare mpi_imet_1/medium.txt mpi_imet_$NP/medium.txt " (metal slab in irip: medium.txt)"
+compare mpi_imeta_1/diag.txt mpi_imeta_$NP/diag.txt " (metal slab in irip, particles = absorb: the stored charge across the ranks, $NP ranks)"
+mcompare mpi_imeta_1/medium.txt mpi_imeta_$NP/medium.txt " (metal slab in irip, absorb: medium.txt)"
+compare mpi_rzmet_1/diag.txt mpi_rzmet_$NP/diag.txt " (RZ rings in irip, $NP ranks along z)"
+mcompare mpi_rzmet_1/medium.txt mpi_rzmet_$NP/medium.txt " (RZ rings in irip: medium.txt)"
+# the absorbed charge in the checkpoint (vlpl_metal_absorbed): from step 9 on NP ranks exactly the uninterrupted run, on 1 and 3
+# ranks to round-off (builds with HDF5)
+MA="$D numerics.solver=irip numerics.shape=2 numerics.medium_tol=1e-13 grid.ny=8 grid.nz=8 grid.dy=0.25um grid.dz=0.25um grid.t_end=60fs output.every=3"
+if $MPIRUN -np 1 $EXE $MA "metal.function=(x - 20 um) * (41 um - x)" metal.particles=absorb --check checkpoint.every=9 > /dev/null 2>&1; then
+    $MPIRUN -np $NP $EXE $MA "species electrons.uth_y=0.3" "species electrons.uth_z=0.3" "metal.function=(x - 20 um) * (41 um - x)" \
+        metal.particles=absorb checkpoint.every=9 output.dir=mpi_imetack_$NP > /dev/null
+    for np in $NP 1 3; do
+        rm -rf mpi_imetars_$np; mkdir -p mpi_imetars_$np/checkpoints
+        cp mpi_imetack_$NP/checkpoints/checkpoint_000009.h5 mpi_imetars_$np/checkpoints/
+        cp mpi_imetack_$NP/diag.txt mpi_imetack_$NP/medium.txt mpi_imetars_$np/
+        $MPIRUN -np $np $EXE $MA "species electrons.uth_y=0.3" "species electrons.uth_z=0.3" "metal.function=(x - 20 um) * (41 um - x)" \
+            metal.particles=absorb output.dir=mpi_imetars_$np --restart latest > /dev/null
+    done
+    same_run mpi_imetack_$NP/diag.txt mpi_imetars_$NP/diag.txt " (metal slab in irip, absorb: restart from step 9)"
+    for np in 1 3; do
+        compare mpi_imetack_$NP/diag.txt mpi_imetars_$np/diag.txt " (metal slab in irip, absorb: restart of $NP ranks on $np)"
+    done
+else
+    echo "mpi (metal absorb in irip, restart): skipped (built without HDF5)"
+fi
+# end of the metal blocks in irip
 # O7 restarts (HDF5): the media state in the checkpoint (linear J, P; the atoms' density matrix, bP, the last Et): the Rb deck and
 # the RZ medium deck from step 200 (the window decks from a step after shifts) on NP ranks (exactly the uninterrupted run, diag.txt and medium.txt), on 1 and 3 ranks
 o7_restart() {     # name, checkpoint step, deck and overrides

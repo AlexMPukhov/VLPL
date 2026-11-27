@@ -212,11 +212,17 @@ void metal_plasma(Comm& comm) {
              "output {\n dir = rz_metal_test_out\n every = 1000\n}\n";
     }
     Deck dk = Deck::read(path);
-    for (int jk = 0; jk < 4; ++jk) {
+    // both rings.particles modes (decision 122): absorb, then pass (the default: the plasma crosses the rings; more particles
+    // survive, only the outer wall takes them)
+    double nabs = 0;
+    for (int run = 0; run < 8; ++run) {
+        const int jk = run / 2;
+        const bool absorb = run % 2 == 0;
         const int order = 1 + jk % 2;
-        const std::string tag = jk < 2 ? "" : " + jacket";
+        const std::string tag = std::string(jk < 2 ? "" : " + jacket") + (absorb ? ", particles = absorb" : ", particles = pass");
         dk.override_from(std::string("numerics.shape=") + std::to_string(order));
-        if (jk == 2) { dk.override_from("rings.r_out=0.72um"); dk.override_from("rings.jacket=0.24um"); }
+        dk.override_from(absorb ? "rings.particles=absorb" : "rings.particles=pass");
+        if (run == 4) { dk.override_from("rings.r_out=0.72um"); dk.override_from("rings.jacket=0.24um"); }
         Config c = Config::from_deck(dk);
         Simulation sim(c, comm);
         sim.init();
@@ -243,15 +249,20 @@ void metal_plasma(Comm& comm) {
         }
         inside = comm.allreduce_max(inside);
         check("rz metal M3: plasma with rings" + tag + " (shape " + std::to_string(order) + "): Gauss law and div B off the surface at round-off",
-              g < 1e-12 * std::max(rmax, 1e-30) + 1e-14 && db < 1e-12 && n1 < n0 && inside == 0,
+              g < 1e-12 * std::max(rmax, 1e-30) + 1e-14 && db < 1e-12 && (absorb ? n1 < n0 : n1 > nabs && n1 <= n0) && inside == 0,
               fmt("Gauss %.1e", g) + fmt(" (max rho %.1e)", rmax) + fmt(", div B %.1e", db) + fmt(", particles %.0f", n0) +
                   fmt(" -> %.0f", n1) + fmt(", E_part_out(e) %.2e", lost));
+        if (absorb) nabs = n1;
     }
     bool rejected = false;
     dk.override_from("rings.jacket=0um");
     dk.override_from("numerics.solver=irip");
-    try { Config::from_deck(dk); } catch (const std::exception& e) { rejected = std::string(e.what()).find("rip_cc") != std::string::npos; }
-    check("rz metal: rings with iRIP rejected", rejected, "");
+    std::string why;                               // decision 124: in irip the rings are a Drude medium named rings
+    try {
+        const Config ci = Config::from_deck(dk);
+        rejected = !(ci.media.size() == 1 && ci.media[0].name == "rings" && !ci.rings.on);
+    } catch (const std::exception& e) { rejected = true; why = e.what(); }
+    check("rz metal: rings with iRIP become a Drude medium (decision 124)", !rejected, why);
     if (comm.rank == 0) std::remove(path);
 }
 

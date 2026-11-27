@@ -32,6 +32,7 @@
 
 struct MetalPhiConfig {
     bool on = false;
+    bool absorb = false;               // metal.particles = absorb (default pass, decision 122)
     Expr fn;                           // metal where fn(x, y, z, r, phi) > 0 (code units)
     std::string text;
     bool spectral = false;             // phi_derivative = spectral (axisymmetric masks only); default: difference

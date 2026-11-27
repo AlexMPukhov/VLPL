@@ -326,9 +326,198 @@ static void medium_parabolic(Comm& comm) {
               fmt(" lambda; GMRES %.1f", a.its) + fmt(" / %.1f per step", b.its));
 }
 
+// L9. The block metal with numerics.solver = irip (decision 124): the conductor is a Drude medium with omega_p dt = 10 by
+//     default. (a) the deck: one medium named metal with that density; particles = absorb rejected. (b) a pulse at normal
+//     incidence on a metal slab comes back whole, the field energy deeper than two cells inside stays small. (c) a hot plasma
+//     crossing a metal slab, 3D, shape 2: the Gauss law (with the medium charge) at round-off, no particle lost.
+static void metal_irip(Comm& comm) {
+    {
+        const double um = 2 * M_PI;                               // 1 um in code units (lambda0 = 1 um)
+        const double x0 = 7 * um, xs = 14 * um, w = 2 * um;
+        const std::string t =
+            "grid {\n geometry = cartesian2d\n lambda0 = 1 um\n nx = 420\n ny = 4\n dx = 0.05 um\n dy = 0.05 um\n t_end = 100 fs\n}\n"
+            "numerics {\n solver = irip\n medium_tol = 1e-12\n}\n"
+            "metal {\n function = x - 14 um\n}\n"
+            "output {\n dir = medium_tmp_out\n}\n";
+        Config c = deck_config(t, "medium_tmp.deck");
+        const double wd = 10.0 / c.dt();
+        const bool cfg_ok = c.media.size() == 1 && c.media[0].name == "metal" && std::abs(c.media[0].density / (wd * wd) - 1) < 1e-12 &&
+                            c.metal.medium && !c.metal.on;
+        bool rejected = false;                         // particles = absorb: accepted in Cart3D / 2D (L9e)
+        {
+            Deck x = Deck::read("medium_tmp.deck");
+            x.override_from("metal.particles=absorb");
+            try {
+                const Config ca = Config::from_deck(x);
+                rejected = ca.metal.medium && ca.metal.absorb && ca.media.size() == 1;
+            } catch (const std::exception&) { rejected = false; }
+        }
+        check("metal in irip L9a: the block becomes a Drude medium with omega_p dt = 10; particles = absorb accepted", cfg_ok && rejected,
+              fmt("density %.4g n_c", c.media.empty() ? 0.0 : c.media[0].density));
+        Simulation sim(c, comm);
+        sim.init();
+        const Domain& d = sim.dom;
+        {
+            H ey(sim.fields->ey), bz(sim.fields->bz);
+            for (int j = 0; j < d.n[1]; ++j)
+                for (int i = 0; i < d.n[0]; ++i) {
+                    const double x = d.lo(0) + i * d.h[0], g = std::exp(-std::pow((x - x0) / w, 2)) * std::cos(x - x0);
+                    ey(i, j, 0) = g; bz(i, j, 0) = g;
+                }
+            ey.put(sim.fields->ey); bz.put(sim.fields->bz);
+        }
+        comm.exchange(d, {&sim.fields->ey, &sim.fields->bz});
+        auto energy = [&](double xa, double xb) {                // field energy of the owned cells with xa <= x < xb
+            double s = 0;
+            for (const Field* f : {&sim.fields->ex, &sim.fields->ey, &sim.fields->ez, &sim.fields->bx, &sim.fields->by, &sim.fields->bz}) {
+                const std::vector<double> h = f->host();
+                for (int j = 0; j < d.n[1]; ++j)
+                    for (int i = 0; i < d.n[0]; ++i) {
+                        const double x = d.lo(0) + i * d.h[0];
+                        if (x >= xa && x < xb) s += h[f->idx(i, j, 0)] * h[f->idx(i, j, 0)];
+                    }
+            }
+            comm.allreduce_sum(&s, 1);
+            return s;
+        };
+        const double w0 = energy(-1e300, 1e300);
+        const int steps = int(std::round(2 * (xs - x0) / d.h[0]));
+        double deep = 0;
+        for (int n = 0; n < steps; ++n) {
+            sim.step();
+            deep = std::max(deep, energy(xs + 2.5 * d.h[0], 20 * um) / w0);
+        }
+        const double R = energy(-1e300, xs) / w0;
+        check("metal in irip L9b: a pulse at normal incidence on the metal comes back whole; no field deeper than two cells inside",
+              std::abs(R - 1) < 1e-6 && deep < 1e-3 && sim.medium->stats.unconverged == 0,
+              fmt("|R - 1| %.1e", std::abs(R - 1)) + fmt(", energy deeper than two cells <= %.1e W0", deep) +
+                  fmt(", GMRES %.1f per step", double(sim.medium->stats.iterations) / sim.medium->stats.solves));
+    }
+    {
+        const std::string t =
+            "grid {\n lambda0 = 1 um\n nx = 16\n ny = 8\n nz = 6\n dx = 0.05 um\n dy = 0.04 um\n dz = 0.05 um\n t_end = 3 fs\n}\n"
+            "numerics {\n solver = irip\n shape = 2\n medium_tol = 1e-12\n}\n"
+            "species e {\n charge = -1\n mass = 1\n density = 2\n xmax = 0.5 um\n ppc_x = 2\n ppc_y = 2\n ppc_z = 2\n"
+            " uth_x = 0.2\n uth_y = 0.2\n uth_z = 0.2\n}\n"
+            "species i {\n charge = 1\n mass = 1836\n density = 2\n xmax = 0.5 um\n ppc_x = 2\n ppc_y = 2\n ppc_z = 2\n mobile = false\n}\n"
+            "metal {\n function = (x - 0.3 um) * (0.62 um - x)\n}\n"
+            "output {\n dir = medium_tmp_out\n}\n";
+        Config c = deck_config(t, "medium_tmp.deck");
+        Simulation sim(c, comm);
+        sim.init();
+        auto count = [&] {
+            double n = 0;
+            for (const Species& sp : sim.species) n += double(sp.size());
+            comm.allreduce_sum(&n, 1);
+            return n;
+        };
+        const double n0 = count();
+        double g = 0;
+        while (!sim.finished()) {
+            sim.step();
+            g = std::max(g, sim.gauss_drift());
+        }
+        const double n1 = count();
+        const MediumStats& ms = sim.medium->stats;
+        check("metal in irip L9c: a hot plasma crossing a metal slab (omega_p dt = 10), 3D: Gauss law, no particle lost",
+              g < 1e-12 && n1 == n0 && ms.unconverged == 0,
+              fmt("Gauss %.1e", g) + fmt(", particles %.0f -> %.0f", n0, n1) + fmt(", GMRES %.1f per solve", double(ms.iterations) / ms.solves));
+        // (e) the same with particles = absorb, 3D and 2D: the electrons that enter the slab are removed, their charge stays at rest
+        //     (Simulation::rho_abs_): the Gauss law still at round-off, and the total charge on the grid (particles + absorbed +
+        //     medium) stays 0 although the electrons that are left no longer balance the ions
+        for (int flat = 0; flat < 2; ++flat) {
+            std::string ta = t;                        // 2D: no z cells, no ppc_z
+            auto cut = [&](const std::string& a, const std::string& b) {
+                for (size_t p = ta.find(a); p != std::string::npos; p = ta.find(a, p + b.size())) ta.replace(p, a.size(), b);
+            };
+            cut("metal {\n", "metal {\n particles = absorb\n");
+            if (flat) { cut(" nz = 6\n", ""); cut(" dz = 0.05 um\n", ""); cut(" ppc_z = 2\n", ""); cut("grid {\n", "grid {\n geometry = cartesian2d\n"); }
+            Config ca = deck_config(ta, "medium_tmp.deck");
+            Simulation sa(ca, comm);
+            sa.init();
+            auto cnt = [&](int q) {
+                double n = double(sa.species[size_t(q)].size());
+                comm.allreduce_sum(&n, 1);
+                return n;
+            };
+            auto qsum = [&](double& tot, double& mx) {       // sum and max |rho| over the owned cells (after gauss_drift)
+                const std::vector<double> h = sa.fields->rho.host();
+                tot = 0; mx = 0;
+                for (int k = 0; k < sa.dom.n[2]; ++k)
+                    for (int j = 0; j < sa.dom.n[1]; ++j)
+                        for (int i = 0; i < sa.dom.n[0]; ++i) {
+                            const double v = h[sa.fields->rho.idx(i, j, k)];
+                            tot += v; mx = std::max(mx, std::abs(v));
+                        }
+                comm.allreduce_sum(&tot, 1);
+                mx = comm.allreduce_max(mx);
+            };
+            const double e0 = cnt(0), i0 = cnt(1);
+            double ga = 0, tot = 0, mx = 0, worst = 0;
+            while (!sa.finished()) {
+                sa.step();
+                ga = std::max(ga, sa.gauss_drift());
+                qsum(tot, mx);
+                worst = std::max(worst, std::abs(tot));
+            }
+            const double e1 = cnt(0), i1 = cnt(1);
+            const double cells = double(sa.dom.N[0]) * sa.dom.N[1] * sa.dom.N[2];
+            check(std::string("metal in irip L9e (") + (flat ? "2D" : "3D") + "): particles = absorb: electrons removed in the slab, their charge "
+                      "stays at rest: Gauss law, total charge on the grid",
+                  ga < 1e-12 && e1 < e0 && i1 == i0 && worst / (cells * std::max(mx, 1e-300)) < 1e-12 && sa.medium->stats.unconverged == 0,
+                  fmt("Gauss %.1e", ga) + fmt(", electrons %.0f -> %.0f", e0, e1) + fmt(", ions %.0f -> %.0f", i0, i1) +
+                      fmt(", |sum rho| / (cells max |rho|) %.1e", worst / (cells * std::max(mx, 1e-300))) + fmt(" (max |rho| %.2g)", mx));
+        }
+    }
+    // (d) RZ (irip, modes 0, 1): the rings block and an axisymmetric metal function as media; a plasma column through them: the
+    //     Gauss law; the coefficient inside a ring and in a gap; a function of phi rejected
+    for (int v = 0; v < 2; ++v) {
+        const std::string t =
+            std::string("grid {\n geometry = rz\n modes = 2\n lambda0 = 1 um\n nz = 16\n nr = 12\n dz = 0.1 um\n dr = 0.05 um\n t_end = 3 fs\n}\n"
+                        "numerics {\n solver = irip\n shape = 2\n medium_tol = 1e-12\n}\n"
+                        "species e {\n charge = -1\n mass = 1\n density = 2\n rmax = 0.3 um\n zmax = 0.9 um\n ppc_r = 4\n ppc_theta = 8\n"
+                        " uth_z = 0.2\n uth_x = 0.2\n uth_y = 0.2\n}\n"
+                        "species i {\n charge = 1\n mass = 1836\n density = 2\n rmax = 0.3 um\n zmax = 0.9 um\n ppc_r = 4\n ppc_theta = 8\n mobile = false\n}\n") +
+            (v == 0 ? "rings {\n r_in = 0.2 um\n r_out = 0.45 um\n period = 0.6 um\n gap = 0.2 um\n z_start = 0.2 um\n z_end = 1.4 um\n}\n"
+                    : "metal {\n function = min(min(r - 0.2 um, 0.45 um - r), min(z - 0.2 um, 0.6 um - z))\n}\n") +
+            "output {\n dir = medium_tmp_out\n}\n";
+        Config c = deck_config(t, "medium_tmp.deck");
+        bool rejected = false;                         // RZ: a function of phi; particles = absorb (not in RZ irip yet)
+        {
+            Deck x = Deck::read("medium_tmp.deck");
+            x.override_from(v == 1 ? "metal.function=min(r - 0.2 um, 0.45 um - r) * cos(2 * phi)" : "rings.particles=absorb");
+            try { Config::from_deck(x); } catch (const std::exception&) { rejected = true; }
+        }
+        Simulation sim(c, comm);
+        sim.init();
+        const Domain& d = sim.dom;
+        double in = -1, out = -1;                     // Jz at (z, r) = (0.4, 0.3) um: inside; (0.7, 0.3) um: the gap (v = 1: vacuum)
+        {
+            H w(sim.medium->wp2[0]);
+            const int i4 = 4 - d.off[0], i7 = 7 - d.off[0];
+            if (i4 >= 0 && i4 < d.n[0]) in = w(i4, 6, 0);
+            if (i7 >= 0 && i7 < d.n[0]) out = w(i7, 6, 0);
+        }
+        in = comm.allreduce_max(in); out = comm.allreduce_max(out);
+        const double wd = 10.0 / c.dt();
+        double g = 0;
+        while (!sim.finished()) {
+            sim.step();
+            g = std::max(g, sim.gauss_drift());
+        }
+        check(std::string("metal in irip L9d (RZ, modes 0, 1): ") + (v == 0 ? "rings" : "an axisymmetric metal function; a function of phi rejected") +
+                  ": omega_p dt = 10 inside, 0 in the gap, Gauss law with a plasma column through it",
+              c.media.size() == 1 && std::abs(in / (wd * wd) - 1) < 1e-12 && out == 0 && g < 1e-12 && rejected && sim.medium->stats.unconverged == 0,
+              fmt("wp^2 inside %.4g, in the gap %.1g", in, out) + fmt(", Gauss %.1e", g) +
+                  fmt(", GMRES %.1f per solve", double(sim.medium->stats.iterations) / sim.medium->stats.solves));
+    }
+    if (comm.rank == 0) std::remove("medium_tmp.deck");
+}
+
 void test_medium2(Comm& comm) {
     medium_deck(comm);
     medium_gauss_particles(comm);
+    metal_irip(comm);
     medium_rz(comm);
     if (comm.size > 1) return;
     medium_parabolic(comm);

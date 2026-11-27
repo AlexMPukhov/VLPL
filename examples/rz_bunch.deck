@@ -1,0 +1,28 @@
+# A Gaussian electron bunch from a `bunch` block (no file), written in the common input form of the VLPL family:
+# 10 pC, 204 MeV, sigma_z = sigma_x = sigma_y = 3 um, eps_n = 1 um (beta* = gamma sigma^2 / eps_n = 3.6 mm), drifting
+# 1 mm in vacuum with its self-field in a window moving at c. Free space: sigma(z) = sigma0 sqrt(1 + (z / beta*)^2),
+# 3.113 um after 1 mm; energy and emittance stay.
+# The radial boundary is a conducting wall: an absorbing layer takes energy from the bunch (0.12 MeV per mm in this
+# box, proportional to the charge), because it removes the outer part of the bunch's own field.
+#   build/vlpl examples/rz_bunch.deck        (about 2 minutes on 16 cores; beam_witness.txt has the moments)
+grid { geometry = rz; m_max = 1; lambda0 = 1 um
+  nz = 320; dz = 0.25 um            # 80 um window; rip_cc in RZ: dz^2 lambda_max / 4 < 1 needs dz below 0.79 dr here
+  nr = 80;  dr = 0.5 um             # 40 um
+  boundary_z = open; boundary_r = wall
+  t_end = 3336 fs                   # 1 mm / c = 4000 steps
+}
+numerics { solver = rip_cc; pusher = boris }
+window { start = 0 fs; velocity = 1 }
+
+bunch witness {
+  species = electron
+  charge = 10 pC;  energy = 203.8887 MeV;  energy_spread = 1e-4
+  sigma_x = 3 um;  sigma_y = 3 um;  sigma_z = 3 um
+  emittance_x = 1 um;  emittance_y = 1 um
+  z_center = 55 um                  # the centroid at t = 0
+  macroparticles = 200000
+  self_field = true
+}
+
+diagnostic witness { species = witness; every = 1000 }
+output { dir = out_rz_bunch; every = 1000 }

@@ -16,7 +16,7 @@ The scripts for the first multi-GPU run and the timings on JUPITER / JUWELS Boos
 Numerical emittance of a 1 nm beam (Fig. 4 of JCP 418, 109622) and of a witness in a wake, all solvers and FBPIC:
 `bench/emittance/`.
 
-Plan: `docs/ROADMAP.md`; current state: `docs/STATUS.md`; conventions: `CLAUDE.md`, `docs/decisions.md`.
+Plan: `docs/ROADMAP.md`; current state: `docs/STATUS.md`; conventions: `docs/decisions.md`.
 Licence: BSD-3 (`LICENSE`).
 
 ## Build, test, run
@@ -45,8 +45,18 @@ build/vlpl examples/beam_vacuum.deck                   # a relativistic beam sta
 python3 tools/movie.py out_reflect --fields Ez n_electrons    # -> out_reflect/movie.mp4 (matplotlib, ffmpeg)
 ```
 
-Any key can be overridden on the command line as `block.key=value`. Unknown keys, missing units and
-units of the wrong kind are errors (deck parser taken over from GEM-PIC-3D).
+Any key can be overridden on the command line as `block.key=value`. Unknown keys, a key given twice in a block,
+missing units and units of the wrong kind are errors (deck parser taken over from GEM-PIC-3D).
+
+**Deck syntax** (the common input form of the VLPL family: VLPL, GEM-PIC-RZ, QUARZ; docs/specs/deck_standard.md):
+blocks `name { key = value }`; a statement ends at the end of the line or at `;`, so a block may stand on one line
+(`window { start = 40 fs; velocity = 1 }`); `#` starts a comment. Keys and the kind of a block (`grid`, the
+`species` of `species Electrons`) do not depend on the case; the name given to a block does. Units: lengths
+`nm um mm cm m` (emittances also `mm*mrad`), times `as fs ps ns s`, charges `fC pC nC uC`, energies `eV keV MeV GeV
+TeV`, angles `rad mrad urad deg`; a density is a bare number in n_c (as always) or carries `cm^-3`, `m^-3`, `n_c`.
+Common names, rewritten into the keys below: `grid.m_max` (highest azimuthal mode: `modes = m_max + 1`), laser
+`wavelength` (= `grid.lambda0`), `tau_fwhm` (= `duration`), `z_focus` (= `focus`), and a species `charge` with a
+unit (= `total_charge` of a file beam). Two names of one quantity in one deck are an error.
 
 ## Units
 
@@ -257,7 +267,8 @@ checkpoint { every (0: off), keep = 2, stop_after_hours = 0 }   # restart with -
 medium [<name>] { model = drude|lorentz, density (wp^2 / omega0^2 = n / n_c), collision_frequency = 0 (nu / omega0),
             resonance (lorentz: omega_r / omega0), permittivity (lorentz, instead of density: the real eps at omega0
             without damping, wp^2 = (eps - 1)(omega_r^2 - 1)), profile = <factor of x, y, z (RZ: z, r)>, supersample = 4 }
-                                     # O7: a particle-free linear medium (plasma mirror, lossy plasma, glass) for irip with
+                                     # O7: a particle-free linear medium (plasma mirror, lossy plasma, glass; also a metal
+                                     # with finite conductivity). Requires numerics.solver = irip (decision 123), with
                                      # closure = box, any omega_p dt; Crank-Nicolson current driven by the box closure's work
                                      # field, W + K + dissipated exact; the profile's sub-cell volume fraction at each current
                                      # position; Cart3D, 2D, RZ (all modes), CPML (media one cell clear of the layers), MPI,
@@ -299,7 +310,7 @@ RZ with azimuthal modes (`docs/specs/rz_modes.md`; z is the transport axis, c dt
 z with laser and moving window, a conducting wall at r = nr dr that absorbs particles (optionally behind
 a radial absorbing layer for the fields), openPMD output in thetaMode, checkpoints and restart as below):
 ```
-grid      { geometry = rz, modes = 2 (m = 0 .. modes - 1), lambda0, nz nr, dz dr, boundary_z = periodic|open|absorbing
+grid      { geometry = rz, modes = 2 (m = 0 .. modes - 1; or m_max = modes - 1), lambda0, nz nr, dz dr, boundary_z = periodic|open|absorbing
             (absorbing: damping layers at both z ends, z_absorber_width = 4 lambda0 | z_absorber_cells, z_absorber_R0 = 1e-4;
             the laser then comes through laser.tfsf_x),
             boundary_r = wall|absorbing (r_absorber_cells = 32, r_absorber_R0 = 1e-4), t_end, mpi_z,
@@ -351,11 +362,15 @@ species <name> { charge, mass, density, ppc_z ppc_r ppc_theta (default 1 1 4), u
                  zmin zmax rmin rmax, density_function = f(z, r, x, y, phi), t_start, mobile = true (false: a fixed
                  background, e.g. ions), self_field = false (true: the steady field of a beam along z, open z, at the
                  start; Gauss law at round-off; decision 83) }   # deposition with density-conserving shapes (decision 53)
-rings     { r_in, r_out, period, gap, z_start, z_end, jacket }   # embedded perfect conductors: metal rings r_in < r < r_out of
+rings     { r_in, r_out, period, gap, z_start, z_end, jacket, particles = pass|absorb }   # embedded perfect conductors: metal rings r_in < r < r_out of
                                      # thickness period - gap, fixed in the lab frame (also with the window); staircase on the
                                      # grid (r_in, r_out snapped to radial nodes, faces to z cells), tangential E = 0 and normal
-                                     # B = 0, total reflection at the z faces through the RIP transport, particles inside removed;
-                                     # gap = 0: a tube, r_in = 0: discs; rip_cc only (docs/specs/rz_metal.md, decision 83)
+                                     # B = 0, total reflection at the z faces through the RIP transport; particles = pass (default):
+                                     # particles cross the metal (no field inside), absorb: removed inside (decision 122);
+                                     # gap = 0: a tube, r_in = 0: discs; rip_cc (docs/specs/rz_metal.md, decision 83). With
+                                     # numerics.solver = irip the rings are a Drude medium (decision 124): density = n / n_c
+                                     # (default omega_p dt = 10: a mirror), collision_frequency = 0; particles pass
+                                     # (particles = absorb is refused in RZ with irip)
                                      # jacket > 0: a solid tube r_out .. r_out + jacket over [z_start, z_end] closes the gaps
                                      # (closed corrugated pipe with an open end at z_end); one convenience geometry: conductors
                                      # of any shape (also axisymmetric) with the block metal below
@@ -372,13 +387,15 @@ dielectric [<name>] { r_in, r_out, z_start, z_end, eps, ramp }   # lossless diel
                                      # metal block (also depending on phi: the lines solved on the 2M - 1 angles);
                                      # examples bench/rz_dielectric/dwa.deck (a lined tube, the wall the
                                      # grid edge), cherenkov.deck
-metal     { function, phi_derivative = difference|spectral, enabled = true }   # RZ: conductors that depend on the azimuth:
+metal     { function, phi_derivative = difference|spectral, particles = pass|absorb, enabled = true }   # RZ: conductors that depend on the azimuth:
                                      # metal where function(x, y, z, r, phi) > 0 (lab frame, also with the window), on the
                                      # 2M - 1 angles of the modes; difference (default): the phi derivative becomes the
                                      # staggered difference over 2 pi / (2M - 1) (i m -> i m_eff, a Yee grid in phi), a
                                      # staircase in r and phi, z faces as rings; couples m and m +- 4 for a C4 shape (a square
                                      # pipe: examples/rz_square_pipe.deck); spectral: axisymmetric masks only (=
-                                     # rings); particles inside removed; rip_cc only (docs/specs/rz_metal_phi.md, decision 103)
+                                     # rings); rip_cc (docs/specs/rz_metal_phi.md, decision 103). With numerics.solver = irip:
+                                     # a function of z and r only, as a Drude medium (decision 124; keys density,
+                                     # collision_frequency as for rings; particles pass)
 quadrupole <name> { z_start, length, gradient [T/m], x_center, y_center }   # RZ: B_x = -G (y - y_c), B_y = -G (x - x_c), G > 0
                                      # focuses electrons in x; edges averaged over the kick; quadrupole_lattice { file, z_offset }
 species <name> { file = beam.h5, z_center, x_offset, y_offset, self_field, rigid_until, ... }   # openPMD beam (as Cart3D)
@@ -408,9 +425,16 @@ metal with 17 modes and the axis cut: the C4 coupling of m and m +- 4).
 Structure runs in Cart3D (decision 102, docs/specs/structure3d.md): a bunch through a metallic structure of any 3D shape,
 inside external quadrupoles, with the wake diagnostics. Files written for z-propagating codes map (x, y, z) -> (y, z, x).
 ```
-metal     { function = f(x, y, z) }  # perfect conductor where f > 0 (absolute coordinates, lab-fixed, also with the window):
+metal     { function = f(x, y, z), particles = pass|absorb }  # with numerics.solver = irip: a Drude medium where f > 0 (decision 124), keys
+                                     # density = n / n_c (default omega_p dt = 10: a mirror with a skin depth of dx / 10) and
+                                     # collision_frequency = 0 (finite conductivity); particles = pass (default): through its fields,
+                                     # absorb: removed inside, their charge stays at rest where they stopped (not with a
+                                     # moving window; the stored charge is in the checkpoints). rip_cc:
+                                     # perfect conductor where f > 0 (absolute coordinates, lab-fixed, also with the window):
                                      # staircase on the RIP-CC grid (tangential E = 0, total reflection at x faces through the
-                                     # RIP transport, the Gauss law exact off the surface), particles inside absorbed; rip_cc only
+                                     # RIP transport, the Gauss law exact off the surface); particles = pass (default): particles
+                                     # cross the metal on straight lines (no field inside), absorb: removed inside, the conductor
+                                     # keeps their charge (decision 122); rip_cc only
 dielectric [<name>] { eps }          # lossless dielectric, Cart3D and 2D (docs/specs/dielectric3d.md, decision 100): eps a number
                                      # (everywhere) or an expression of x, y, z (lab frame, units), blocks add their eps - 1;
                                      # time-centred polarization current (lines along x, ranks along x by a partition solve),
@@ -426,6 +450,15 @@ species <name> { file = beam.h5, file_species, file_iteration, x_center, y_cente
                  total_charge, macroparticles, resample_smoothing, self_field, rigid_until }
                                      # a beam from an openPMD particle file (electrons / positrons; the charge centroid at
                                      # x_center; resampling as GEM-PIC-RZ); the summary prints its moments
+bunch <name> { species = electron|positron, charge (total, e.g. 10 pC), energy (kinetic) | gamma, energy_spread (relative rms),
+               sigma_x, sigma_y (default sigma_x), sigma_z, emittance_x, emittance_y (normalized rms; default emittance_x),
+               z_center, x_offset, y_offset, macroparticles = 100000, self_field, t_start, rigid_until }
+                                     # a Gaussian bunch without a file, in the coordinates of the beam in every geometry:
+                                     # z along the propagation (the x of a Cartesian run), x and y across it; z_center: the
+                                     # centroid at t = 0 (lab); offsets from the axis (r = 0 in RZ, the box centre in
+                                     # Cartesian runs). At its waist at t = 0, uncorrelated, not truncated, equal weights;
+                                     # becomes a species of that name (diagnostic, openpmd_species). Every rank draws
+                                     # the same particles in portions and keeps its own. examples/rz_bunch.deck
 wake <name> { y, z, every, start }   # F/q = (Ex, Ey - Bz, Ez + By) at the probe along the window and its integral over time
                                      # at fixed xi = x - c t (the wake potential, V) -> dir/wake_<name>.txt (window at v = c)
 beam_slices <name> { species, dx, every }   # Q, I, centroids, sizes, energy and spread per slice of xi -> dir/slices_<name>.txt

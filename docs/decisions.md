@@ -2121,3 +2121,135 @@ Accepted by Alexander on 2026-10-26 (merge of the architecture spec, PR #1).
     - Open, for Alexander: the starting values that are not measured for VLPL (transverse cell <= waist / 20 and
       (c / omega_p) / 5, ppc for cold plasma, the window length, the box of 3 spots, omega_p dt <= 0.2 for wakefields) are
       common PIC practice proposed by the session, listed in docs/agent_skill.md "What the rules are based on".
+
+120. **The omega_p dt start-up checks count a boosted beam with its density in the boosted frame, n' = n gamma_b (1 - beta_b
+    beta_beam) (Alexander, 2026-11-24: "Yes, fix and rerun")** (branch boost-check-density; src/sim.hpp
+    `Config::check_density_factor`, the three sums in src/sim.cpp: Config::check (Cartesian), Config::check_rz,
+    Simulation::check_peak_density; tests/test_boost.cpp B11).
+    - Before: the deck density is a lab value, apply_boost leaves it so, and the checks summed it unconverted for every
+      species, with the boosted c dt'. A gamma 1e4 beam at gamma_b = 10 was checked with 20 times its boosted density: lab
+      n = 11.7 n_c, lab dz = lambda/51.2 (c dt' = 0.3117 um) gave sqrt(11.7) k0 c dt' = 8.37 and the refusal "omega_p dt >= 2
+      (iRIP)", although the boosted omega_b' dt' = 1.875 (found in the bunch-in-vacuum density scan of the iRIP paper review).
+    - Now, per boost kind: boost_kind 2 (beam, ballistic map): n gamma_b (1 - beta_b beta_beam), beta_beam the lab velocity
+      (0.0501 n at gamma 1e4, gamma_b 10; a beam against the boost becomes denser, up to 2 gamma_b n). boost_kind 1 (plasma
+      at rest in the lab): unchanged, the lab density n. Its boosted density is gamma_b n, but the plasma streams at -beta_b c,
+      and the response that enters the explicit current is the transverse one, n' / gamma_b = n (longitudinal n / gamma_b^2),
+      so the lab density is already the right number; changing it would refuse boosted LWFA decks that run stably. Without
+      boost: unchanged. The ionization term (wp2_electrons) gets the same factor as its species.
+    - Only the check changes, not the solver or its limit: iRIP and Yee omega_p dt < 2, RIP-CC
+      dx^2 (1/dy^2 + 1/dz^2) + (omega_p dt)^2 / 4 < 1 (RZ: with lambda_max), now evaluated with the boosted beam density.
+    - Kept conservative on purpose: the check uses the rest mass. A relativistic beam responds with n' / gamma' (transverse;
+      = n / gamma, the proper density, a Lorentz invariant), which would relax the check by gamma' (500 for the beam above);
+      not applied, as the limit of a beam with a momentum spread was not measured. For Alexander if it ever matters.
+    - Test B11: the boosted RZ / iRIP deck above is accepted at lab n = 11.7 n_c (omega_b' dt' = 1.875) and refused at 20 n_c
+      (2.45); the factor equals gamma_b (1 - beta_b beta_beam) to 1e-9; a plasma at rest in the same deck has factor 1; the
+      lab-frame deck with dx = c dt' is refused at 11.7 n_c and accepted at 0.5 n_c, as before.
+122. **Metal blocks: particles cross the metal by default; absorption is an option (`particles = pass | absorb`; Alexander,
+    2026-11-25: "why should we remove particles from metals or set their charges to zero? I suggest we introduce a switch")**
+    (branch metal-particles; blocks `metal` in Cart3D / 2D and RZ, `rings`; src/metal3d.cpp, src/structure.cpp, src/rz_sim.cpp,
+    src/species.cpp `remove_flagged`; tests S4, S4b, M3, P5).
+    - Found by Oliver in a foam-in-cone pair-production run: positrons and photons that reached the cone wall ended with
+      w = 0 and gamma = 1. The metal absorbed every species, photons included, and kept the dead particles in the arrays
+      (pushed and written every step). Absorption was a simplification for the wakefield structures (the wall as a sink for
+      halo), not a requirement of the scheme: the Gauss checks skip the points with metal in their stencil.
+    - `pass` (the default): nothing is done to the particles. The fields at the metal points are 0, so a particle inside moves
+      on a straight line; entry and exit change the surface charge (transition radiation). For 100 MeV - 1 GeV particles and
+      um-thick walls this is the physics to first order (gold, 10 um: ~22 keV collisional and ~0.3 % radiative loss, 0.23 % of
+      the photons convert; multiple scattering ~7 mrad at 100 MeV is NOT modelled). Slow particles cross a wall too, where a
+      real wall stops them (electrons below ~100 keV in 10 um of gold): the reason `absorb` stays.
+    - `absorb`: as before for a particle whose shape lies inside the metal, but it is removed from the species. The charge
+      it carried stays on the conductor as surface charge: its current up to the surface was deposited and the field step
+      conserves charge (a floating conductor; S4b: flux of E around an isolated plate = the absorbed charge).
+    - Fixed on the way in the Cart3D absorption: the guard test left half-cell sheets at the upper rank edges untested
+      (shape 2: 1 rank != N ranks); in 2D particles in the upper half of the slab were never absorbed; photons were booked
+      with m (gamma - 1) instead of w |u|.
+    - Results change for decks with a metal block or rings whose particles reach the metal (the default is now pass): set
+      `particles = absorb` for the old behaviour. The outer RZ wall and the open edges absorb as before.
+    - Planned, not in this step (Alexander, 2026-11-25): the same choice for a metal with finite conductivity (a Drude medium:
+      local plasma frequency and collision frequency) in every solver, the perfect conductor in the implicit solvers, and a
+      material option (stopping power, scattering, bremsstrahlung, Bethe-Heitler, trident).
+
+123. **The Drude / Lorentz medium requires iRIP (Alexander, accepted on 2026-11-25: "if the drude model works with the iRIP
+    scheme, we can accept it and write: Drude requires iRIP").** The `medium` blocks stay with `numerics.solver = irip`
+    (decision 84); rip_cc keeps refusing them. A metal with finite conductivity is a `medium` block in an iRIP run; particles
+    cross it in its self-consistent fields.
+    - Tried on 2026-11-25 in the explicit step (branch `medium-explicit`, not for merging; Cart3D / 2D): the time-centred
+      current J^{n+1} - J^n = dt (wp2 Ebar - w02 Pbar - nu u), E_x local with (1 + chi + b), E_y and E_z in the lines along x of
+      the dielectric blocks (decision 100) with chi -> chi + b, b = wp2 dt^2 / (4 (1 + nu dt / 2 + w02 dt^2 / 4)).
+    - What works: a uniform medium for any omega_p dt (von Neumann, wp^2 dt^2 = 0.01 ... 1e6: |g| - 1 at round-off); no damping
+      without collisions (lossless overdense slab at normal incidence: |R - 1| = 7e-12, 2e-12, 4e-12 at omega_p dt = 0.5, 3, 20);
+      s-polarized Fresnel reflection, refraction angle and collisional absorption at second order; Gauss law with particles 4e-15.
+    - What fails: p-polarization (medium in E_x and E_y together) with a density that varies along x. Energy after 8000 steps
+      of random fields, lossless: sharp slab 1.0e5 (2D) and 2.5e5 (3D) at omega_p dt = 3, 2e6 at 30; a smooth cosine density
+      133 (2D) and 4.7e8 (3D); with nu dt = 1 the dissipated energy reaches 300 - 600 E0. The matrix of one step of the real
+      code (8 x 6 and 16 x 10 cells): medium in E_x only, E_y only or E_z only is stable for every profile; E_x + E_y with a
+      gradient grows by up to 5e-3 per step, the mode is the local plasma oscillation in the gradient (84 % of its norm in J).
+    - Ruled out as cures: iterating the predictor of E_x towards the time mean (1, 2, 3, 5 passes: the slab stays at 9e-4 per
+      step); driving the transverse current with the exact work field of the transport, (M+ + M-) / 2 (local current, stable
+      in the small matrices, but the 8000-step runs still grow: slab 3e4, cosine 2e3 in 2D). The explicit step conserves a
+      modified energy only; iRIP has the exact balance W + K + dissipated for any medium shape (decision 84), which is the
+      reason for the choice.
+    - The dielectric blocks of decision 100 are not affected: a sharp eps = 4 slab stays at 1.13 (2D), 1.14 (3D) of the
+      initial energy over 8000 steps in the same test.
+    - Scripts and the diagnosis switches: branch `medium-explicit`, research/drude_cc/ (vonneumann.py, eig.py; line.py is a
+      prototype that mispredicted the dielectric: not to be used for interfaces), tests/test_medium.cpp (VLPL_MEDCC_*).
+    - Open (Alexander's stages): the perfect conductor (`metal`, `rings`) in the implicit solvers; a material model.
+
+124. **Metal blocks in the implicit solvers are a dense Drude medium (Alexander, 2026-11-25: "Yes, start stage 3"; proposal:
+    the perfect metal in the implicit solvers as a Drude medium of very high density).** Branch metal-implicit;
+    src/structure.cpp `metal_medium`, src/sim.cpp (RZ); tests L9a-e (tests/test_medium2.cpp), tests/mpi.sh.
+    - With `numerics.solver = irip` the blocks `metal` (Cart3D / 2D: function(x, y, z) > 0; RZ: a function of z and r) and
+      `rings` (RZ: rings, gaps, jacket) become a `medium` block of that name (decision 84) with the block's shape as profile.
+      rip_cc keeps the staircase perfect conductor (decisions 83, 102, 103).
+    - Density: `density` (n / n_c) if given, otherwise omega_p dt = 10: a skin depth of dx / 10, so the surface is a mirror
+      and nothing reaches the third cell (L9b: |R - 1| = 3e-12, field energy deeper than two cells <= 6e-13 of the pulse).
+      `collision_frequency` (nu / omega0, default 0) gives the metal with finite conductivity in the same block.
+    - Why a medium and not E = 0 in the implicit solve: the medium has the exact energy balance and the Gauss law of
+      decision 84 for any shape, costs no new solver, and the surface enters by its sub-cell volume fraction instead of a
+      staircase. The price: GMRES iterations (25 - 28 per solve in L9c, L9d with a hot plasma inside), and the medium keeps
+      one cell clear of CPML layers and of the radial absorber.
+    - Particles cross the metal in its self-consistent fields (`particles = pass`, the default).
+    - `particles = absorb` (Alexander, 2026-11-25: "Yes, add absorb"), Cart3D / 2D: a particle whose shape lies inside the
+      block (the node mask of decision 102, `Simulation::metal_mask_`) is removed; the charge density it deposited is kept
+      at rest in `Simulation::rho_abs_` and added to the particle charge in `compute_rho`, so the Gauss law (with the
+      polarization charge of the medium) is untouched by the removal and the medium screens the stored charge as it
+      screened the particle (src/structure.cpp `metal_absorb_medium`: two extra charge deposits of a species, only in a
+      step in which it loses particles). Test L9e. Limits: refused with a moving window (the stored charge is not shifted)
+      and in RZ (`rings`, `metal`). The stored charge is kept on the owned cells (the removed charge of the guard cells
+      goes to its owners, a collective exchange in every step in which any rank absorbed a particle) and is written to
+      the checkpoints (mesh `vlpl_metal_absorbed`): a restart on the same ranks is exact, on other rank counts to
+      round-off (tests/mpi.sh).
+    - RZ: the medium has the same coefficients for all azimuthal modes, so a metal function of x, y or phi is refused in irip
+      (rip_cc has the block metal on the collocation angles, decision 103).
+
+125. **The common input form of the VLPL family in VLPL (Alexander, 2026-11-26: the deck standard for VLPL, GEM-PIC-RZ
+    and QUARZ accepted as proposed; "Yes, VLPL next"; "add these features to VLPL").** Branch deck-standard;
+    src/deck.*, `Deck::apply_standard_names`, block `bunch` (src/structure.cpp `species_bunch_from_deck`,
+    src/beam_import.* `BunchSource`, `MomentSums`); tests/test_deck.cpp; docs/specs/deck_standard.md;
+    examples/rz_bunch.deck.
+    - Syntax: a statement ends at the end of the line or at `;`, a block may stand on one line; keys and block kinds
+      in any case (the name given to a block keeps its case: it is in file names); a key twice in a block is an error
+      (before: the last one won silently). Every deck that ran before runs unchanged.
+    - Units: energies eV .. TeV, emittances mm*mrad, more spellings (µm, micron, as, s, fC, uC, urad); a density is a
+      bare number in n_c as always, or carries cm^-3, m^-3 (converted with grid.lambda0) or n_c.
+    - Common names as aliases, rewritten before the configuration is read: grid.m_max (modes = m_max + 1), laser
+      wavelength (sets grid.lambda0 or must equal it), tau_fwhm (duration), z_focus (focus), species charge with a unit
+      (total_charge). Two names of one quantity are an error.
+    - Block `bunch <name>`: a Gaussian bunch by charge, energy, spread, sizes and normalized emittances, at its waist,
+      in beam coordinates (z along the propagation) in every geometry; it goes through the beam-import path (self-field
+      init, t_start, rigid_until). Why a generator inside the code: GEM-PIC-RZ and QUARZ have one, and a chain test
+      should not need a file for its first stage. Memory rule: every rank draws the same sequence (mt19937_64, 7 normal
+      numbers per particle) in portions of 2^18 and keeps its own particles; the printed moments are one-pass sums
+      about the nominal centre. Electrons and positrons only.
+    - A beam from a file is read block-wise as well (Alexander, 2026-11-26: reading the whole file on every rank "is a
+      straight bug. fix it!"): `BeamFileSource` in src/beam_import.*, 2^18 particles at a time, up to three passes
+      (total weight and the rms for the jitter; charge centroid and mean gamma; delivery); arithmetic and the order of
+      the random numbers as in the former import, so the particles are unchanged. Test S6b (tests/test_structure.cpp).
+    - Not changed: `output.every` keeps its
+      VLPL meaning (rows of diag.txt). Positions stay absolute lab coordinates.
+    - Numbers (the CPU cluster epyc, job 18147, binaries of a46d7bf built 2026-11-26 20:42 / 20:46): compact form and common names =
+      the old start-up summary; 1.742e19 cm^-3 -> n / n_c to 3.4e-9; 200000 generated particles against the deck:
+      Q 3.8e-12, E 7.7e-8, dE/E 2.6e-4, sigma 3.1e-3 / 1.1e-3 / 3.3e-5, eps_n 8.3e-4 / 4.5e-4; portions = one portion;
+      one-pass moments = file_moments to 3.8e-12. examples/rz_bunch.deck (1 mm, conducting wall): sigma 2.996 / 3.002 ->
+      3.1086 / 3.1140 um (free drift with the sampled moments 3.1099 / 3.1155, 0.05 % below), eps_n unchanged to 6
+      digits, E 203.88875 -> 203.88933 MeV (+0.0006 MeV), dE/E 1.00e-4 -> 1.03e-4.

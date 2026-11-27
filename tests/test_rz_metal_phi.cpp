@@ -300,8 +300,13 @@ void plasma(Comm& comm) {
              "output {\n dir = rz_metal_phi_test_out\n every = 100000\n}\n";
     }
     Deck dk = Deck::read(path);
-    for (int order = 1; order <= 2; ++order) {
+    // both metal.particles modes (decision 122): absorb, then pass (the default: the plasma crosses the ridges)
+    double nabs = 0;
+    for (int run = 0; run < 4; ++run) {
+        const int order = 1 + run / 2;
+        const bool absorb = run % 2 == 0;
         dk.override_from(std::string("numerics.shape=") + std::to_string(order));
+        dk.override_from(absorb ? "metal.particles=absorb" : "metal.particles=pass");
         Config c = Config::from_deck(dk);
         Simulation sim(c, comm);
         sim.init();
@@ -316,15 +321,23 @@ void plasma(Comm& comm) {
         }
         double n1 = double(sim.species[0].size()) + double(sim.species[1].size());
 
-        check("rz metal_phi P5: plasma with corrugated ridges (shape " + std::to_string(order) + "): Gauss law, div B, absorption",
-              gmax < 1e-12 * std::max(rmax, 1e-30) + 1e-14 && dbm < 1e-12 && n1 < n0,
+        check("rz metal_phi P5: plasma with corrugated ridges (shape " + std::to_string(order) + "): Gauss law, div B, particles = " +
+                  (absorb ? "absorb" : "pass"),
+              gmax < 1e-12 * std::max(rmax, 1e-30) + 1e-14 && dbm < 1e-12 && (absorb ? n1 < n0 : n1 > nabs && n1 <= n0),
               fmt("Gauss %.1e", gmax) + fmt(" (max rho %.1e)", rmax) + fmt(", div B %.1e", dbm) + fmt(", particles %.0f", n0) +
                   fmt(" -> %.0f", n1));
+        if (absorb) nabs = n1;
     }
     bool rejected = false;
     dk.override_from("numerics.solver=irip");
-    try { Config c = Config::from_deck(dk); c.check_rz(); } catch (const std::exception& e) { rejected = std::string(e.what()).find("rip_cc") != std::string::npos; }
-    check("rz metal_phi: the metal block with iRIP rejected", rejected, "");
+    std::string why;                               // decision 124: irip takes the block as a medium, a function of z and r only
+    try {
+        Config c = Config::from_deck(dk);
+        c.check_rz();
+        rejected = c.media.size() == 1 && c.media[0].name == "metal";      // an axisymmetric function: accepted as a medium
+        why = "accepted as a medium";
+    } catch (const std::exception& e) { why = e.what(); rejected = why.find("z and r only") != std::string::npos; }
+    check("rz metal_phi: the metal block with iRIP: a function of phi rejected (axisymmetric: a medium, decision 124)", rejected, why.substr(0, 120));
     if (comm.rank == 0) std::remove(path);
 }
 

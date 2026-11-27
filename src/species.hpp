@@ -106,3 +106,9 @@ private:
 void migrate(Species& s, const Domain& d, Comm& comm, double rwall = 0);
 // All species at once: one message per axis and direction for all of them (the order of each species as one by one)
 void migrate(const std::vector<Species*>& sp, const Domain& d, Comm& comm, double rwall = 0);
+// Removal of particles on the device (e.g. the particles absorbed by a metal block, metal3d.cpp): removal_flags(n) gives
+// a device array of n ints (scratch of the migration; valid until the next removal or migration); set F[p] = 1 for the
+// particles to remove and 0 for all others, then remove_flagged closes the holes from the tail (the order of a
+// migration) and returns the number removed.
+int* removal_flags(long n);
+long remove_flagged(Species& s);

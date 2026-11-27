@@ -24,6 +24,8 @@
 struct RZWork {
     Field X, Y;                               // R_E, R_B, then Ez^{n+1}, Bz^{n+1}
     Field T;                                  // radial transform scratch
+    Field U;                                  // O5: Cz F before the transform (allocated at the first closure)
+    bool u_ready = false;
     Buf<double> V[2], Vi[2], lam[2];          // per kind: M blocks of Nr x Nr (V, Vi) and Nr (lam)
     Buf<double> gf[2];                        // O5: per kind the closure factor g_a (M blocks of Nr)
     Buf<double> g;                            // Thomas scratch, nz per line
@@ -271,6 +273,69 @@ void solve_partitioned(RZWork& W, const Domain& d, Comm& comm, const FV T, int k
     });
 }
 
+// out(i, a, k) = sum_j A_m[a][j] in(i, j, k) for the columns i < nz, rows a < nr and slots k < S, A_m = the nr x nr
+// block m = (k + 1) / 2 of A (row-major). GPU: a tiled product in shared memory (64 x 64 outputs per block of 256
+// threads, 4 x 4 per thread, j in tiles of 16): every output still sums j = 0, 1, .. nr - 1 in order with the same
+// multiply-adds as the plain loop (bit-identical), but each value of A and of the field is read once per tile instead
+// of once per output. The plain loop (one column per thread) was 91 % of the GPU time at nr = 2000 (0.45 s per
+// transform on the RTX 5090, nsys 2026-11-27). CPU: the plain loop.
+#if RIP_GPU
+constexpr int RT_T = 64, RT_K = 16;
+__global__ void __launch_bounds__(256) radial_transform_kernel(const double* __restrict__ A, FV in, FV out, int nz, int nr,
+                                                               long nn) {
+    __shared__ double As[RT_K][RT_T + 1];                 // As[jj][aa] = A_m[a0 + aa][j0 + jj]
+    __shared__ double Bs[RT_K][RT_T];                     // Bs[jj][ii] = in(i0 + ii, j0 + jj, k)
+    const int k = int(blockIdx.z), m = (k + 1) / 2;
+    const double* Am = A + m * nn;
+    const int i0 = int(blockIdx.x) * RT_T, a0 = int(blockIdx.y) * RT_T;
+    const int t = int(threadIdx.x), tx = t % 16, ty = t / 16;
+    double acc[4][4];                                     // acc[r][c]: a = a0 + ty + 16 r, i = i0 + tx + 16 c
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 4; ++c) acc[r][c] = 0;
+    for (int j0 = 0; j0 < nr; j0 += RT_K) {
+        for (int e = t; e < RT_T * RT_K; e += 256) {
+            const int aa = e / RT_K, ja = e % RT_K, a = a0 + aa, j = j0 + ja;
+            As[ja][aa] = a < nr && j < nr ? Am[long(a) * nr + j] : 0.0;
+            const int jb = e / RT_T, ii = e % RT_T, jj = j0 + jb, i = i0 + ii;
+            Bs[jb][ii] = jj < nr && i < nz ? in(i, jj, k) : 0.0;
+        }
+        __syncthreads();
+        const int kk = min(RT_K, nr - j0);                // no padded terms: the sums are those of the plain loop
+        for (int jj = 0; jj < kk; ++jj) {
+            double av[4], bv[4];
+            for (int r = 0; r < 4; ++r) av[r] = As[jj][ty + 16 * r];
+            for (int c = 0; c < 4; ++c) bv[c] = Bs[jj][tx + 16 * c];
+            for (int r = 0; r < 4; ++r)
+                for (int c = 0; c < 4; ++c) acc[r][c] += av[r] * bv[c];
+        }
+        __syncthreads();
+    }
+    for (int r = 0; r < 4; ++r)
+        for (int c = 0; c < 4; ++c) {
+            const int a = a0 + ty + 16 * r, i = i0 + tx + 16 * c;
+            if (a < nr && i < nz) out(i, a, k) = acc[r][c];
+        }
+}
+#endif
+void radial_transform(const double* A, const FV in, const FV out, int nz, int nr, int S) {
+    const long nn = long(nr) * nr;
+#if RIP_GPU
+    const dim3 grid(unsigned((nz + RT_T - 1) / RT_T), unsigned((nr + RT_T - 1) / RT_T), unsigned(S));
+    radial_transform_kernel<<<grid, 256, 0, rip_stream()>>>(A, in, out, nz, nr, nn);
+    gpu_check(cudaGetLastError(), "radial transform launch");
+#else
+    par_for(long(nz) * S, [=] HD(long q) {
+        const int i = int(q % nz), k = int(q / nz), m = (k + 1) / 2;
+        const double* Am = A + m * nn;
+        for (int a = 0; a < nr; ++a) {
+            double s = 0;
+            for (int j = 0; j < nr; ++j) s += Am[long(a) * nr + j] * in(i, j, k);
+            out(i, a, k) = s;
+        }
+    });
+#endif
+}
+
 // (I - D^2/4 mu_z^2 L_m) X = R in place in F for all modes, kind 0 (E) or 1 (B); O5 (o5):
 // (I - D^2/4 mu_z^2 Cz L_m C_perp) X = R, two line solves per radial mode.
 void solve(RZWork& W, const Domain& d, Comm& comm, Field& F, int kind, bool o5) {
@@ -283,17 +348,7 @@ void solve(RZWork& W, const Domain& d, Comm& comm, Field& F, int kind, bool o5) 
     const double* lam = W.lam[kind].data();
     const double* gf = o5 ? W.gf[kind].data() : nullptr;
     double* g = W.g.data();
-    const long nn = long(nr) * nr;
-    // radial transform of every column (i, slot)
-    par_for(long(nz) * S, [=] HD(long q) {
-        const int i = int(q % nz), k = int(q / nz), m = (k + 1) / 2;
-        const double* A = Vi + m * nn;
-        for (int a = 0; a < nr; ++a) {
-            double s = 0;
-            for (int j = 0; j < nr; ++j) s += A[long(a) * nr + j] * R(i, j, k);
-            T(i, a, k) = s;
-        }
-    });
+    radial_transform(Vi, R, T, nz, nr, S);           // radial transform of every column (i, slot)
     // per (radial mode a, slot k) the system along z (stride 1 in the Field layout)
     for (int pass = 0; pass < (o5 ? 2 : 1); ++pass)
     if (comm.dims[0] > 1) solve_partitioned(W, d, comm, T, kind, gf, pass);
@@ -315,16 +370,7 @@ void solve(RZWork& W, const Domain& d, Comm& comm, Field& F, int kind, bool o5) 
         const double f = (x[0] + s * x[nz - 1] / gam) / (1 + z[0] + s * z[nz - 1] / gam);
         for (int i = 0; i < nz; ++i) x[i] -= f * z[i];
     });
-    // back
-    par_for(long(nz) * S, [=] HD(long q) {
-        const int i = int(q % nz), k = int(q / nz), m = (k + 1) / 2;
-        const double* A = V + m * nn;
-        for (int j = 0; j < nr; ++j) {
-            double s = 0;
-            for (int a = 0; a < nr; ++a) s += A[long(j) * nr + a] * T(i, a, k);
-            R(i, j, k) = s;
-        }
-    });
+    radial_transform(V, T, R, nz, nr, S);            // back
 }
 // O5: F <- Cz C_perp F on the owned cells (guards valid on entry), then exchanged. Per column (i, slot) the radial
 // transform of Cz F, times g_a, back.
@@ -335,26 +381,20 @@ void o5_closure(RZWork& W, const Domain& d, Comm& comm, Field& f, int kind, bool
     const double* V = W.V[kind].data();
     const double* Vi = W.Vi[kind].data();
     const double* gf = W.gf[kind].data();
-    const long nn = long(nr) * nr;
-    par_for(long(nz) * S, [=] HD(long q) {
-        const int i = int(q % nz), k = int(q / nz), m = (k + 1) / 2;
-        const double* A = Vi + m * nn;
-        for (int a = 0; a < nr; ++a) {
-            double s = 0;
-            for (int j = 0; j < nr; ++j)
-                s += A[long(a) * nr + j] * (cz ? F(i, j, k) - (F(i + 1, j, k) - 2 * F(i, j, k) + F(i - 1, j, k)) / 3 : F(i, j, k));
-            T(i, a, k) = gf[long(m) * nr + a] * s;
-        }
+    // Cz F into the scratch U (the same values the transform read inline before), the tiled transform, times g_a, back:
+    // bit-identical to the former per-column loop, which was ~5x slower than the whole plain step at nr = 605 (2026-11-27)
+    if (!W.u_ready) { W.U.resize(d); W.u_ready = true; }
+    const FV U = W.U.view();
+    par_for(long(nz) * nr * S, [=] HD(long q) {
+        const int i = int(q % nz), j = int(q / nz % nr), k = int(q / (long(nz) * nr));
+        U(i, j, k) = cz ? F(i, j, k) - (F(i + 1, j, k) - 2 * F(i, j, k) + F(i - 1, j, k)) / 3 : F(i, j, k);
     });
-    par_for(long(nz) * S, [=] HD(long q) {
-        const int i = int(q % nz), k = int(q / nz), m = (k + 1) / 2;
-        const double* A = V + m * nn;
-        for (int j = 0; j < nr; ++j) {
-            double s = 0;
-            for (int a = 0; a < nr; ++a) s += A[long(j) * nr + a] * T(i, a, k);
-            F(i, j, k) = s;
-        }
+    radial_transform(Vi, U, T, nz, nr, S);
+    par_for(long(nz) * nr * S, [=] HD(long q) {
+        const int i = int(q % nz), a = int(q / nz % nr), k = int(q / (long(nz) * nr)), m = (k + 1) / 2;
+        T(i, a, k) *= gf[long(m) * nr + a];
     });
+    radial_transform(V, T, F, nz, nr, S);
     comm.exchange(d, {&f});
 }
 }  // namespace
@@ -367,6 +407,13 @@ void rz_o5_closure(FieldsRZ& f, Comm& comm, Field& x, int kind, bool cz) {
 void rz_basis(const RadialGrid& g, int m, int kind, std::vector<double>& V, std::vector<double>& Vi, std::vector<double>& lam,
               std::vector<double>& h2) {
     basis(g, m, kind, V, Vi, lam, &h2);
+}
+
+void rz_radial_transform(const std::vector<double>& A, const Field& in, Field& out, int nz, int nr, int S) {
+    Buf<double> b;
+    b.upload(A);
+    radial_transform(b.data(), in.view(), out.view(), nz, nr, S);
+    device_sync();
 }
 
 void rz_tm_basis(const RadialGrid& g, int m, std::vector<double>& V, std::vector<double>& Vi, std::vector<double>& lam) {

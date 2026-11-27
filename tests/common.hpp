@@ -19,6 +19,7 @@ struct H {
 
 void test_window(Comm& comm);              // tests/test_window.cpp
 void test_profile(Comm& comm);             // tests/test_profile.cpp
+void test_deck(Comm& comm);                // tests/test_deck.cpp (common input standard)
 void test_beam(Comm& comm);                // tests/test_beam.cpp
 void test_diag(Comm& comm);                // tests/test_diag.cpp
 void test_pml(Comm& comm);                 // tests/test_pml.cpp

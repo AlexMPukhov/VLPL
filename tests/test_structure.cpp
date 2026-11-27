@@ -253,10 +253,13 @@ SpeciesConfig hot(const char* name, double q, double m, double n, double uth) {
 //     particles absorbed by the metal (also at the start), stable. Hot electrons in a periodic box (with and without CPML
 //     layers in y, z), cold plasma in the moving window (the metal enters with the window). (A hot plasma that fills a
 //     window from t = 0 breaks the frozen-entry bookkeeping of decision 91 also without metal: 0.12 at u_th = 0.2.)
+//     Both metal.particles modes (decision 122): absorb (energy removed), and pass, the default (the plasma crosses the metal:
+//     the same checks; in the periodic box without layers no particle is lost).
 void gauss_plasma(Comm& comm) {
-    for (int run = 0; run < 3; ++run) {
-        const bool pml = run == 1, win = run == 2;
+    for (int run = 0; run < 6; ++run) {
+        const bool pml = run % 3 == 1, win = run % 3 == 2, absorb = run < 3;
         Config c;
+        c.metal.absorb = absorb;
         c.N[0] = 48; c.N[1] = 28; c.N[2] = 28;
         c.h[0] = 0.2; c.h[1] = 0.4; c.h[2] = 0.4;
         c.periodic[0] = !win;
@@ -273,19 +276,93 @@ void gauss_plasma(Comm& comm) {
         c.check(); c.check_structure();
         Simulation sim(c, comm);
         sim.init();
-        double g = 0, b = 0, lost = 0;
+        double g = 0, b = 0, lost = 0, n0 = 0, n1 = 0;
+        for (auto& s : sim.species) n0 += double(s.size());
+        comm.allreduce_sum(&n0, 1);
         while (!sim.finished()) {
             sim.step();
             g = std::max(g, sim.gauss_drift());
             b = std::max(b, comm.allreduce_max(sim.fields->max_div_b()));
         }
-        for (auto& s : sim.species) lost += s.lost_energy;
+        for (auto& s : sim.species) { lost += s.lost_energy; n1 += double(s.size()); }
         comm.allreduce_sum(&lost, 1);
+        comm.allreduce_sum(&n1, 1);
         double w = sim.fields->energy();
         comm.allreduce_sum(&w, 1);
-        check(std::string("metal S4: Gauss law and div B, plasma in a corrugated tube") + (win ? ", window, CPML" : pml ? ", CPML" : ""),
-              g < 1e-12 && b < 1e-12 && lost > 0 && std::isfinite(w) && (!win || sim.dom.wx > 20),
-              fmt("max|dGauss| %.1e, max|divB| %.1e", g, b) + fmt(", absorbed W_kin %.3g, shifts %.0f", lost, double(sim.dom.wx)));
+        // absorb: energy removed (also at the start: the plasma loaded inside the walls); pass, periodic: every particle kept
+        const bool part = absorb ? lost > 0 && n1 < n0 : (pml || win || (n1 == n0 && lost == 0));
+        check(std::string("metal S4: Gauss law and div B, plasma in a corrugated tube") + (win ? ", window, CPML" : pml ? ", CPML" : "") +
+                  (absorb ? ", particles = absorb" : ", particles = pass"),
+              g < 1e-12 && b < 1e-12 && part && std::isfinite(w) && (!win || sim.dom.wx > 20),
+              fmt("max|dGauss| %.1e, max|divB| %.1e", g, b) + fmt(", removed W_kin %.3g, shifts %.0f", lost, double(sim.dom.wx)) +
+                  fmt(", particles %.0f", n0) + fmt(" -> %.0f", n1));
+    }
+}
+
+// S4b. metal.particles (decision 122): a cold electron bunch (its ions stay behind, immobile) flies into an isolated plate in a
+//      periodic box. absorb: every electron is removed inside the plate and the plate keeps their charge: the flux of E out of
+//      a slab of the box around it, sum_jk (Ex(ib) - Ex(ia)) hy hz = sum div E dV, equals the absorbed charge sum q w, and their
+//      kinetic energy is booked. pass: the bunch crosses the plate (no field inside: straight lines) and leaves it neutral:
+//      the same flux is 0, no particle is lost, <u_x> is kept. The Gauss law at the checked points at round-off in both.
+void plate_charge(Comm& comm) {
+    for (int mode = 0; mode < 2; ++mode) {
+        const bool absorb = mode == 0;
+        Config c;
+        c.N[0] = 64; c.N[1] = 24; c.N[2] = 24;
+        c.h[0] = 0.2; c.h[1] = 0.4; c.h[2] = 0.4;
+        c.t_end = 9.6;
+        c.metal.on = true; c.metal.absorb = absorb;
+        // the plate 6 < x < 8, 2 < y, z < 7.6 (9 x 13 x 13 nodes)
+        c.metal.fn = metal_expr("abs(x - 7.0) < 1.0 && max(abs(y - 4.8), abs(z - 4.8)) < 2.8 ? 1 : -1");
+        const double n = 1e-4, u0 = 2.0;
+        c.species = {hot("e", -1, 1, n, 0.0), hot("i", 1, 1836, n, 0.0)};
+        c.species[0].u0[0] = u0;
+        c.species[1].mobile = false;
+        for (auto& s : c.species) {
+            s.rmin[0] = 2.0; s.rmax[0] = 3.0;
+            for (int a = 1; a < 3; ++a) { s.rmin[a] = 4.0; s.rmax[a] = 5.6; }
+        }
+        c.check(); c.check_structure();
+        Simulation sim(c, comm);
+        sim.init();
+        double q0 = 0, n0 = double(sim.species[0].size());
+        for (double w : sim.species[0].get(Species::W)) q0 -= w;        // the charge of the electrons, sum q w
+        comm.allreduce_sum(&q0, 1); comm.allreduce_sum(&n0, 1);
+        double g = 0;
+        while (!sim.finished()) { sim.step(); g = std::max(g, sim.gauss_drift()); }
+        // the flux out of the slab of cells 22 <= i < 50 (x = 4.4 .. 10: the plate inside, the ions and at the end the
+        // electrons of the pass run outside); the transverse terms of div E cancel over the periodic y, z
+        const int ia = 22, ib = 50;
+        const std::vector<double> ex = sim.fields->ex.host();
+        const Domain& d = sim.dom;
+        double v[5] = {0, 0, 0, 0, 0};                                  // flux, electrons left, sum w, sum w ux, lost energy
+        for (int k = 0; k < d.n[2]; ++k)
+            for (int j = 0; j < d.n[1]; ++j)
+                for (int i = 0; i < d.n[0]; ++i) {
+                    const int gi = d.off[0] + i;
+                    if (gi == ib) v[0] += ex[sim.fields->ex.idx(i, j, k)];
+                    if (gi == ia) v[0] -= ex[sim.fields->ex.idx(i, j, k)];
+                }
+        v[0] *= d.h[1] * d.h[2];
+        v[1] = double(sim.species[0].size());
+        {
+            const std::vector<double> w = sim.species[0].get(Species::W), ux = sim.species[0].get(Species::UX);
+            for (size_t p = 0; p < w.size(); ++p) { v[2] += w[p]; v[3] += w[p] * ux[p]; }
+        }
+        v[4] = sim.species[0].lost_energy;
+        comm.allreduce_sum(v, 5);
+        const double aq = std::abs(q0), wk = aq * (std::sqrt(1 + u0 * u0) - 1);
+        if (absorb)
+            check("metal S4b: particles = absorb: the bunch is removed in the plate, the plate keeps its charge",
+                  n0 > 0 && v[1] == 0 && std::abs(v[0] - q0) < 1e-9 * aq && std::abs(v[4] / wk - 1) < 1e-2 && g < 1e-12 * n,
+                  fmt("electrons %.0f", n0) + fmt(" -> %.0f", v[1]) + fmt(", flux / Q - 1 = %.1e", v[0] / q0 - 1) +
+                      fmt(", removed W_kin / W_kin(0) = %.4f", v[4] / wk) + fmt(", max|dGauss| %.1e", g));
+        else
+            check("metal S4b: particles = pass (default): the bunch crosses the plate, the plate stays neutral",
+                  n0 > 0 && v[1] == n0 && std::abs(v[2] / aq - 1) < 1e-13 && std::abs(v[0]) < 1e-9 * aq &&
+                      std::abs(v[3] / (v[2] * u0) - 1) < 1e-2 && v[4] == 0 && g < 1e-12 * n,
+                  fmt("electrons %.0f", n0) + fmt(" -> %.0f", v[1]) + fmt(", flux / Q = %.1e", v[0] / aq) +
+                      fmt(", <u_x> / u_0 - 1 = %.1e", v[3] / (v[2] * u0) - 1) + fmt(", max|dGauss| %.1e", g));
     }
 }
 
@@ -456,6 +533,122 @@ void beam_file(Comm& comm) {
     check("beam file S6: openPMD import = moments of the written beam (and resampled)", worst < 1e-10 && rs < 3e-2,
           fmt("max rel. error %.1e, resampled %.1e", worst, rs));
 }
+
+// S6b. A beam file larger than one portion of the import (2^18 particles): BeamFileSource reads it block-wise, no rank
+//      holds the whole beam. References computed here from the arrays written to the file: (1) every delivered particle
+//      = the file's particle, placed about the charge centroid; (2) resampled without jitter: every delivered particle
+//      is a copy of a file particle in the file's order, and the first k file particles are taken M cum(w_k) / W times
+//      within 1 (systematic sampling); (3) with jitter: portions of 100000 = one call for all, to the last bit.
+void beam_file_portions(Comm& comm) {
+    const double QE = 1.602176634e-19, ME = 9.1093837015e-31, CL = 299792458.0;
+    const std::string path = "test_structure_beam_big.h5";
+    const size_t n = 600001;                                   // 2.29 portions
+    std::mt19937_64 rng(11);
+    std::normal_distribution<double> nd(0, 1);
+    std::uniform_real_distribution<double> ud(0.5, 1.5);
+    std::vector<double> px(n), py(n), pz(n), ux(n), uy(n), uz(n), w(n);
+    for (size_t k = 0; k < n; ++k) {
+        px[k] = 8 * nd(rng) + 3; py[k] = 6 * nd(rng) - 2; pz[k] = 100 * nd(rng);      // um
+        uz[k] = 2000 * (1 + 1e-3 * nd(rng)); ux[k] = 0.5 * nd(rng); uy[k] = 0.4 * nd(rng);
+        w[k] = 1e6 * ud(rng);
+    }
+    if (comm.rank == 0) {
+        h5::Id f = h5::create_file(path);
+        h5::attr(f, "openPMD", "1.1.0"); h5::attr(f, "basePath", "/data/%T/"); h5::attr(f, "particlesPath", "particles/");
+        h5::attr(f, "meshesPath", "meshes/");
+        const std::string g = "/data/3/particles/beam/";
+        auto ds = [&](const std::string& p, const std::vector<double>& v, double unit) {
+            h5::Id grp = h5::group(f, p.substr(0, p.rfind('/')));
+            h5::Id d = h5::dataset<double>(grp, p.substr(p.rfind('/') + 1), {hsize_t(n)});
+            h5::write<double>(d, v.data(), {0}, {hsize_t(n)});
+            h5::attr<double>(d, "unitSI", unit);
+        };
+        auto cst = [&](const std::string& p, double v, double unit) {
+            h5::Id gr = h5::group(f, p);
+            h5::attr<double>(gr, "value", v); h5::attr<double>(gr, "unitSI", unit);
+            h5::attr<double>(gr, "shape", std::vector<double>{double(n)});
+        };
+        ds(g + "position/x", px, 1e-6); ds(g + "position/y", py, 1e-6); ds(g + "position/z", pz, 1e-6);
+        ds(g + "momentum/x", ux, ME * CL); ds(g + "momentum/y", uy, ME * CL); ds(g + "momentum/z", uz, ME * CL);
+        ds(g + "weighting", w, 1);
+        cst(g + "charge", -QE, 1); cst(g + "mass", ME, 1);
+    }
+    comm.barrier();
+    const double lambda0 = 1e-4, k0 = 2 * M_PI / lambda0, w0 = CL * k0, nc = 8.8541878128e-12 * ME * w0 * w0 / (QE * QE);
+    double W = 0, zc = 0;
+    for (size_t k = 0; k < n; ++k) { W += w[k]; zc += w[k] * pz[k]; }
+    zc /= W;
+    BeamFileConfig c;
+    c.path = path; c.x_center = 25.0; c.y_center = 3.0; c.z_center = 3.0;
+    // (1) plain, in unequal portions
+    double e1 = 0;
+    long got = 0, biggest = 0;
+    {
+        BeamFileSource S(c, lambda0, 3);
+        long portion = 70001;
+        while (S.left() > 0) {
+            const BeamParticles B = S.next(portion);
+            portion = 1L << 18;
+            biggest = std::max(biggest, long(B.size()));
+            for (size_t e = 0; e < B.size(); ++e) {
+                const size_t k = size_t(got) + e;
+                const double r[7] = {25.0 + (pz[k] - zc) * 1e-6 * k0, 3.0 + px[k] * 1e-6 * k0, 3.0 + py[k] * 1e-6 * k0, uz[k], ux[k], uy[k],
+                                     w[k] * k0 * k0 * k0 / nc};
+                const double v[7] = {B.x[e], B.y[e], B.z[e], B.ux[e], B.uy[e], B.uz[e], B.w[e]};
+                for (int a = 0; a < 7; ++a) e1 = std::max(e1, std::abs(v[a] - r[a]) / std::max(1.0, std::abs(r[a])));
+            }
+            got += long(B.size());
+        }
+    }
+    // (2) resampled without jitter: copies in the file's order, counts of systematic sampling
+    const long M = 150000;
+    long bad = 0, copies_ok = 0;
+    {
+        BeamFileConfig c2 = c;
+        c2.macroparticles = M;
+        BeamFileSource S(c2, lambda0, 3);
+        std::vector<long> cnt(n, 0);
+        size_t j = 0;
+        long m = 0;
+        while (S.left() > 0) {
+            const BeamParticles B = S.next(40000);
+            for (size_t e = 0; e < B.size(); ++e, ++m) {
+                const auto eq = [](double a, double b) { return std::abs(a - b) <= 1e-12 * std::max(1.0, std::abs(b)); };   // unitSI and back: round-off
+                while (j < n && !(eq(B.uy[e], ux[j]) && eq(B.uz[e], uy[j]) && eq(B.ux[e], uz[j]))) ++j;   // the order of the file
+                if (j >= n) { ++bad; j = 0; continue; }
+                ++cnt[j];
+            }
+        }
+        if (m != M) ++bad;
+        double cw = 0, cc = 0;                    // systematic sampling: the copies of the first k particles = M cum(w) / W within 1
+        for (size_t k = 0; k < n; ++k) {
+            cw += w[k]; cc += double(cnt[k]);
+            if (std::abs(cc - double(M) * cw / W) <= 1.0 + 1e-6) ++copies_ok;
+        }
+    }
+    // (3) with jitter: portions = one call
+    bool same = true;
+    {
+        BeamFileConfig c3 = c;
+        c3.macroparticles = 300000; c3.smoothing = 0.05; c3.charge = 20e-12;
+        BeamFileSource A(c3, lambda0, 3), Bs(c3, lambda0, 3);
+        const BeamParticles all = A.next(A.left());
+        size_t at = 0;
+        double q = 0;
+        while (Bs.left() > 0) {
+            const BeamParticles B = Bs.next(100000);
+            for (size_t e = 0; e < B.size(); ++e, ++at)
+                same = same && B.x[e] == all.x[at] && B.y[e] == all.y[at] && B.uz[e] == all.uz[at] && B.w[e] == all.w[at];
+        }
+        for (double x : all.w) q += x;
+        same = same && at == all.size() && all.size() == 300000 && std::abs(q * nc / (k0 * k0 * k0) * QE / 20e-12 - 1) < 1e-10;
+    }
+    if (comm.rank == 0) std::remove(path.c_str());
+    check("beam file S6b: 600001 particles read block-wise (portions of at most 2^18) = the written beam; resampling = systematic sampling",
+          got == long(n) && biggest <= (1L << 18) && e1 < 1e-12 && bad == 0 && copies_ok == long(n) && same,
+          fmt("max error %.1e, largest portion %.0f", e1, double(biggest)) + fmt(", resampled: %.0f not found, counts right for %.0f", double(bad), double(copies_ok)) +
+              (same ? "; jitter: portions = one call" : "; JITTER: PORTIONS DIFFER"));
+}
 #endif
 
 // S7. A TE field (Bx blob, uniform in x) radiating into CPML layers in y and z: the field energy inside the side_flux box
@@ -567,9 +760,11 @@ void test_structure(Comm& comm) {
     round_pipe(comm);
     x_face(comm);
     gauss_plasma(comm);
+    plate_charge(comm);
     fodo(comm);
 #ifdef RIP_HDF5
     beam_file(comm);
+    beam_file_portions(comm);
 #endif
     side_flux(comm);
     wake_probe(comm);

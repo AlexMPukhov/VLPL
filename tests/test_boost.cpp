@@ -937,10 +937,58 @@ void boost_beam_checks(Comm& comm) {
               fmt("; ppc_x 28: %.1f planes, %+.2f %%", n2[1], 100 * rel[1]));
 }
 
+// B11. The omega_p dt start-up checks count a boosted beam with its density in the boosted frame (decision 120):
+// n' = n gamma_b (1 - beta_b beta_beam). A gamma 1e4 electron beam (lab n = 11.7 n_c) at gamma_b = 10 in RZ with iRIP, lab dz =
+// lambda / 51.2 (c dt' = 0.3117 um): omega_b' dt' = 1.875, accepted (before: sqrt(11.7) k0 c dt' = 8.37, refused); lab n = 20 n_c:
+// omega_b' dt' = 2.45, still refused. A plasma at rest in the lab keeps its lab density (factor 1). Lab-frame decks unchanged:
+// the same beam without boost on a grid with the same dx = c dt' is refused at 11.7 n_c and accepted at 0.5 n_c.
+void boost_check_density() {
+    auto deck = [](bool boost, double n, double dz_um, bool plasma) {
+        std::ostringstream o;
+        o << "grid {\n geometry = rz\n modes = 2\n lambda0 = 0.8 um\n nz = 400\n nr = 16\n dz = " << dz_um
+          << " um\n dr = 0.81445 um\n boundary_z = open\n t_end = 10 fs\n}\n"
+          << "numerics {\n solver = irip\n shape = 2\n filter_passes = 1\n}\nwindow {\n start = 0 fs\n}\n"
+          << (boost ? "boost {\n gamma = 10\n}\n" : "")
+          << (plasma ? "species e {\n charge = -1\n mass = 1\n density = 1e-3\n zmin = 1000 um\n}\n"
+                     "species i {\n charge = 1\n mass = 1836\n density = 1e-3\n zmin = 1000 um\n}\n" : "")
+          << "species bunch {\n charge = -1\n mass = 1\n density = " << n << "\n uz = 9999.99995\n uth_x = 0.5\n uth_y = 0.5\n"
+          << " ppc_z = 2\n ppc_r = 4\n ppc_theta = 16\n density_function = gauss(z - 4 um, 1 um) * gauss(r, 2 um)\n"
+          << " zmin = 1 um\n zmax = 6 um\n rmax = 6 um\n self_field = true\n}\noutput {\n dir = test_out_boost_check\n}\n";
+        return o.str();
+    };
+    auto refused = [&](bool boost, double n, double dz_um, bool plasma, std::string* msg = nullptr) {
+        try { deck_config(deck(boost, n, dz_um, plasma), "boost_test_tmp.deck"); } catch (const std::exception& e) {
+            if (msg) *msg = e.what();
+            return std::string(e.what()).find("omega_p dt >= 2") != std::string::npos;
+        }
+        return false;
+    };
+    const double dzl = 0.8 / 51.2, gb = 10, bb = std::sqrt(1 - 1 / (gb * gb)), bv = 9999.99995 / std::sqrt(1 + 9999.99995 * 9999.99995);
+    const double fac = gb * (1 - bb * bv), D = gb * (1 + bb) * dzl * 2 * M_PI / 0.8;   // k0 c dt'
+    Config c = deck_config(deck(true, 11.7, dzl, true), "boost_test_tmp.deck");
+    double fb = 0, fp = 0;                                                  // the deck orders the species by name
+    for (const SpeciesConfig& sp : c.species) {
+        if (sp.name == "bunch") fb = c.check_density_factor(sp);
+        if (sp.name == "e") fp = c.check_density_factor(sp);
+    }
+    std::string m20;
+    const bool ok117 = !refused(true, 11.7, dzl, false), no20 = refused(true, 20, dzl, false, &m20);
+    const double dzb = gb * (1 + bb) * dzl;                                 // lab deck with dx = c dt' of the boosted run
+    const bool lab117 = refused(false, 11.7, dzb, false), lab05 = !refused(false, 0.5, dzb, false);
+    check("boost B11: omega_p dt start-up check with the boosted beam density n gamma_b (1 - beta_b beta_beam) (decision 120): "
+          "accepted at omega_b' dt' = 1.875, refused at 2.45; plasma at rest keeps factor 1; lab decks unchanged",
+          std::abs(fb / fac - 1) < 1e-9 && fp == 1.0 && ok117 && no20 && lab117 && lab05,
+          fmt("factor %.6f (analytic %.6f)", fb, fac) + fmt(", plasma %.3g; omega_b' dt' %.3f accepted: ", fp, std::sqrt(11.7 * fac) * D) +
+              (ok117 ? "yes" : "no") + fmt(" (old check %.2f); %.3f refused: ", std::sqrt(11.7) * D, std::sqrt(20 * fac) * D) +
+              (no20 ? "yes" : "no") + "; lab 11.7 n_c refused: " + (lab117 ? "yes" : "no") + ", lab 0.5 n_c accepted: " +
+              (lab05 ? "yes" : "no"));
+}
+
 }  // namespace
 
 void test_boost(Comm& comm) {
     boost_beam_checks(comm);
+    boost_check_density();
 #ifdef RIP_HDF5
     if (std::getenv("BOOST_RESTART_ONLY")) { boost_lab_restart(comm); return; }   // development: B9 alone
 #endif

@@ -98,7 +98,7 @@ MediumConfig medium_block(const Deck& d, const std::string& b, double k0, bool r
         if (!(m.w0 > 0)) throw std::runtime_error(b + ".resonance must be > 0 (model = drude for a free plasma)");
     } else {
         if (d.has(b, "resonance") || d.has(b, "permittivity")) throw std::runtime_error(b + ": resonance, permittivity need model = lorentz");
-        m.density = d.num(b, "density", Kind::None);
+        m.density = d.num(b, "density", Kind::Density);
     }
     if (!(m.density > 0) || m.nu < 0) throw std::runtime_error(b + ": density (wp^2 / omega0^2) > 0 and collision_frequency >= 0");
     if (d.has(b, "profile")) {

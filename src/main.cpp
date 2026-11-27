@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
                 restart = argv[i];
             } else d.override_from(argv[i]);
         }
+        d.apply_standard_names();
         Config c = Config::from_deck(d);
         if (comm.rank == 0) c.summary(stdout, comm.size);
         if (comm.rank == 0) medium_summary(stdout, c);

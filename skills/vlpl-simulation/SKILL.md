@@ -166,9 +166,12 @@ output {
 }
 ```
 
-- **Syntax:** one `key = value` per line (no semicolons); `#` starts a comment; a block is `name {` ... `}`.
+- **Syntax:** `key = value` statements, one per line or separated by `;`; `#` starts a comment; a block is `name {` ... `}`, also on one line. Keys do not depend on the case. A key given twice in a block is an error.
   `references/deck_reference.md` lists the keys of a block in a compact form (`grid { lambda0, nx ny nz, ... }`): that
-  is a list of keys, not deck syntax. Units: nm um mm cm m, fs ps ns, pC nC, rad mrad deg.
+  is a list of keys, not deck syntax. Units: nm um mm cm m (mm*mrad), as fs ps ns s, fC pC nC uC, eV keV MeV GeV TeV,
+  rad mrad urad deg; densities bare (n_c) or with cm^-3, m^-3, n_c. Common names of the VLPL family are accepted:
+  `grid.m_max`, laser `wavelength`, `tau_fwhm`, `z_focus`, and the block `bunch <name>` (a Gaussian bunch by charge,
+  energy, sizes and emittances, no file).
 
 - Blocks with a name (`species <name>`, `laser <name>`, `medium <name>`, `collisions <name>`,
   `diagnostic <name>`) may appear several times. Override on the command line: `vlpl my.deck grid.t_end=30fs

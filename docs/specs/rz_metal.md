@@ -8,7 +8,7 @@ optionally closed by an outer wall), including backward waves.
 ## Physics and equations
 Perfect conductor: tangential E = 0 and normal B = 0 on the surface, all fields 0 inside; the normal E and the
 tangential B on the surface are the surface charge and current. The rings are fixed in the lab frame (they move through
-a moving window). Particles that enter the metal are absorbed.
+a moving window). Particles cross the rings (`rings.particles = pass`, the default) or are absorbed (`absorb`), decision 122.
 
 ## Discretisation
 Staircase on the RIP-CC grid (all fields at integer z columns, rho at i + 1/2; docs/specs/rz_modes.md).
@@ -35,7 +35,8 @@ Staircase on the RIP-CC grid (all fields at integer z columns, rho at i + 1/2; d
   results at metal points changes the Gauss residual only at the rho nodes whose stencil holds such a point: (i + 1/2,
   r_j) with column i or i + 1 metal and J <= j <= K. They carry the surface charge and are left out of the Gauss check
   (div B: J - 1 <= j <= K). Every other node keeps its residual to round-off.
-- **Particles.** After the push, a particle whose shape lies entirely in a ring's closed index rectangle (shape 1: its
+- **Particles** (`rings.particles`, decision 122; `pass`, the default: nothing is done, the particle crosses the metal, where the
+  fields are 0). `absorb`: after the push, a particle whose shape lies entirely in a ring's closed index rectangle (shape 1: its
   position; shape 2: half a cell inside) is moved beyond the wall, so `migrate` absorbs it (its kinetic energy in
   E_part_out). Its current up to there was deposited, so the Gauss law at the checked nodes stays exact.
 - **Stability.** The explicit limit dz^2 (lambda_max + wp^2) / 4 < 1 is unchanged (the metal only removes degrees of

@@ -900,6 +900,7 @@ int main(int argc, char** argv) {
     run("test_box_deposit", [&] { test_box_deposit(comm); });
     run("test_window", [&] { test_window(comm); });
     run("test_profile", [&] { test_profile(comm); });
+    run("test_deck", [&] { test_deck(comm); });
     run("test_beam", [&] { test_beam(comm); });
     run("test_diag", [&] { test_diag(comm); });
     run("test_pml", [&] { test_pml(comm); });
