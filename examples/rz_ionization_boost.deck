@@ -3,8 +3,8 @@
 # 1e-4 n_c atoms), run in the frame boosted by gamma = 2 along z. The ions stream at -0.866 c; the ADK rate is taken from |E|
 # in the ion's rest frame over its proper time, so the charge states after the pulse are those of the lab run
 # (boost.enabled = false; tests/test_boost.cpp B4: N1+ 0.4552 boosted vs 0.4578 lab, 0.9 sigma).
-# out_rz_ionization_boost/ionization.txt: events and charge states (E_ion = gamma_ion I_k w, the
-# energy taken in this frame).
+# out_rz_ionization_boost/ionization.txt: events and charge states (E_ion = sum gamma (1 - beta) I_k w
+# for the forward laser, the energy taken in this frame).
 #   build/vlpl examples/rz_ionization_boost.deck
 grid {
   geometry   = rz

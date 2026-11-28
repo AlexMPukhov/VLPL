@@ -387,6 +387,45 @@ void boost_ionization(Comm& comm) {
         check("boost, ionization: the field in the ion's rest frame = Lorentz transformation; lab plane wave seen by a lab ion",
               worst < 1e-12 && std::abs(r - 1) < 1e-14 && std::abs(g - gb) < 1e-14,
               fmt("1000 random (E, B, u): max rel. difference %.1e", worst) + fmt("; plane wave |E_rest| - 1 = %.1e", r - 1));
+        // the energy the field pays per ionization (ion_energy_factor) against the photon Doppler factor: a lab plane wave of
+        // random direction k and polarization seen from a frame moving at a random V (|V| < 0.95; fields by the Lorentz
+        // transformation), the ion at rest in the lab (u = -gamma V): factor = gamma (1 - V . k); u = 0: exactly 1
+        double wf = 0;
+        for (int t = 0; t < 1000; ++t) {
+            double k[3], a[3], V[3], kn = 0, vn = 0;
+            for (int i = 0; i < 3; ++i) { k[i] = rnd(); a[i] = rnd(); V[i] = rnd(); kn += k[i] * k[i]; vn += V[i] * V[i]; }
+            kn = std::sqrt(kn); vn = std::sqrt(vn);
+            const double vs = 0.95 * std::abs(rnd()) / vn;
+            for (int i = 0; i < 3; ++i) { k[i] /= kn; V[i] *= vs; }
+            const double ak = a[0] * k[0] + a[1] * k[1] + a[2] * k[2];
+            double e[3], en = 0;
+            for (int i = 0; i < 3; ++i) { e[i] = a[i] - ak * k[i]; en += e[i] * e[i]; }
+            en = std::sqrt(en);
+            for (int i = 0; i < 3; ++i) e[i] /= en;
+            const double b[3] = {k[1] * e[2] - k[2] * e[1], k[2] * e[0] - k[0] * e[2], k[0] * e[1] - k[1] * e[0]};
+            const double v2 = V[0] * V[0] + V[1] * V[1] + V[2] * V[2], gv = 1 / std::sqrt(1 - v2);
+            const double ve = V[0] * e[0] + V[1] * e[1] + V[2] * e[2], vb = V[0] * b[0] + V[1] * b[1] + V[2] * b[2];
+            const double vxb[3] = {V[1] * b[2] - V[2] * b[1], V[2] * b[0] - V[0] * b[2], V[0] * b[1] - V[1] * b[0]};
+            const double vxe[3] = {V[1] * e[2] - V[2] * e[1], V[2] * e[0] - V[0] * e[2], V[0] * e[1] - V[1] * e[0]};
+            double Es[3], Bs[3];
+            for (int i = 0; i < 3; ++i) {
+                Es[i] = gv * (e[i] + vxb[i]) - gv * gv / (gv + 1) * V[i] * ve;
+                Bs[i] = gv * (b[i] - vxe[i]) - gv * gv / (gv + 1) * V[i] * vb;
+            }
+            const double fac = ion_energy_factor(Es, Bs, -gv * V[0], -gv * V[1], -gv * V[2]);
+            const double ref = gv * (1 - (V[0] * k[0] + V[1] * k[1] + V[2] * k[2]));
+            wf = std::max(wf, std::abs(fac / ref - 1));
+        }
+        const double fwd = ion_energy_factor(E, B, -gb * bb, 0, 0);
+        const double Eb[3] = {0, 1 / f, 0}, Bb[3] = {0, 0, -1 / f};             // backward lab wave E_y = -B_z = 1
+        const double bwd = ion_energy_factor(Eb, Bb, -gb * bb, 0, 0);
+        const double E0[3] = {0.3, -0.2, 0.7}, B0[3] = {0.1, 0.5, -0.4};
+        const double f0 = ion_energy_factor(E0, B0, 0, 0, 0);
+        check("boost, ionization: energy paid per event = rest-frame (I_k, I_k S) seen from the frame; plane waves: Doppler factor",
+              wf < 1e-12 && std::abs(fwd / (gb * (1 - bb)) - 1) < 1e-14 && std::abs(bwd / (gb * (1 + bb)) - 1) < 1e-14 && f0 == 1.0,
+              fmt("1000 random plane waves and frames: max rel. difference %.1e", wf) +
+                  fmt("; gamma 2 forward %.6f", fwd) + fmt(" (gamma (1 - beta) = %.6f)", gb * (1 - bb)) + fmt(", backward %.6f", bwd) +
+                  fmt(" (gamma (1 + beta) = %.6f)", gb * (1 + bb)) + fmt("; u = 0: %.17g", f0));
     }
     // a0 = 0.0105: N0 / N1+ about 1/2 each (2D, RZ); a0 = 0.03: N0 -> N2+ / N3+, up to three levels per ion (2D)
     const double ea = std::getenv("BOOST_ION_A0") ? std::atof(std::getenv("BOOST_ION_A0")) : 0.0;
@@ -396,6 +435,7 @@ void boost_ionization(Comm& comm) {
         const double a0 = ea > 0 ? ea : cs[1];
         std::vector<double> frac[2], neff(2), wsum(2);
         double gmax = 0, ecur = 0, eion = 0, events[2] = {0, 0}, steps[2] = {0, 0}, ne0 = 0, nemis = 0;
+        double epay[2] = {0, 0};                            // E_ion / sum_p w_p sum_{k < Z_p} I_k: energy paid per unit I_k
         for (int b = 0; b < 2; ++b) {
             std::ostringstream o;
             o << "grid {\n lambda0 = 0.8 um\n";
@@ -439,6 +479,12 @@ void boost_ionization(Comm& comm) {
             for (int k = 0; k < 8; ++k) frac[b].push_back(h[size_t(k)] / W);
             neff[size_t(b)] = W * W / h[8]; wsum[size_t(b)] = W;
             const IonizationTotals T = ionization_totals(s);
+            {
+                const std::vector<double>& ipv = s.cfg.species[size_t(is)].ion.ip_eV;
+                double cum = 0, lab = 0;                    // sum_k h_k sum_{j < k} I_j (m c^2)
+                for (int k = 1; k < 8; ++k) { cum += ipv[size_t(k - 1)] / 510998.95; lab += h[size_t(k)] * cum; }
+                epay[b] = lab > 0 ? T.e_ion / lab : 0;
+            }
             events[b] = double(T.events); steps[b] = double(s.istep);
             nel = double(s.species[size_t(ie)].size());
             comm.allreduce_sum(&nel, 1);
@@ -469,6 +515,13 @@ void boost_ionization(Comm& comm) {
                   fmt(", events %.0f", events[0]) + fmt("/%.0f", events[1]) + fmt(", max|dGauss| %.1e", gmax) +
                   fmt(", E_cur/E_ion - 1 %.1e", dc) + fmt(", steps %.0f", steps[0]) + fmt("/%.0f", steps[1]) +
                   fmt("; electrons at the start %.0f, electrons - events %.0f", ne0, nemis));
+        // the energy the field pays per ionization: I_k in the lab run, gamma (1 - beta) I_k in the boosted run (the forward
+        // laser's Doppler factor; before the correction of 2026-11-28 the boosted run paid gamma I_k, 7.5 times too much)
+        const double gB = 2, dop = gB * (1 - std::sqrt(1 - 1 / (gB * gB)));
+        check(std::string("boost, field ionization (N, a0 = ") + fmt("%.4g", a0) + ", gamma 2), " + (rz ? "RZ" : "2D") +
+                  ": energy paid per ionization = I_k (lab), gamma (1 - beta) I_k (boosted)",
+              std::abs(epay[0] - 1) < 1e-10 && std::abs(epay[1] / dop - 1) < 0.03,
+              fmt("lab E_ion / sum I_k w = %.12f", epay[0]) + fmt("; boosted %.5f", epay[1]) + fmt(" = %.5f gamma (1 - beta)", epay[1] / dop));
     }
 }
 

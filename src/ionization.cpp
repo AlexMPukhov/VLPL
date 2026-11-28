@@ -243,8 +243,9 @@ void ionize_species(Simulation& s, Ionization& I, IonSpecies& e) {
         if (c == 0) return;
         const double ex = E[3 * p], ey = E[3 * p + 1], ez = E[3 * p + 2], e2 = ex * ex + ey * ey + ez * ez;
         const long o = O[p];
-        // boosted frame: the field pays gamma_ion I_k (the rest-frame energy I_k of an ion moving at gamma_ion)
-        const double gi = rest ? sqrt(1.0 + UX[p] * UX[p] + UY[p] * UY[p] + UZ[p] * UZ[p]) : 1.0;
+        // boosted frame: the field pays (gamma_i + u . S_r) I_k, the rest-frame 4-momentum (I_k, I_k S_r) of the tunnel-exit
+        // dipole seen from this frame (ion_energy_factor; gamma (1 - beta) I_k for a forward laser)
+        const double gi = rest ? ion_energy_factor(E + 3 * p, Bf + 3 * p, UX[p], UY[p], UZ[p]) : 1.0;
         for (int j = 0; j < c; ++j) {
             const IonLevel& lv = L[Zs[p] + j];
             const long q = first + o + j;
@@ -383,7 +384,7 @@ void ionization_summary(FILE* f, const Config& c) {
                      ic.electrons.c_str(), ic.current ? "on" : "off");
         if (c.boost.on)
             std::fprintf(f, "    boosted frame: the rate from |E| in the ion's rest frame over its proper time dt / gamma_ion; the "
-                            "ionization current takes gamma_ion I_k (E_ion in this frame)\n");
+                            "ionization current takes (gamma_ion + u . S_rest) I_k, gamma (1 - beta) I_k for a forward laser (E_ion in this frame)\n");
     }
     if (any) std::fprintf(f, "  ionization energies: %s\n", atomic_data_source());
 }

@@ -107,7 +107,8 @@ u'_x = gamma (u_x - beta gamma_p), gamma'_p = gamma (gamma_p - beta u_x). Densit
 - **Field ionization** (decision 90, docs/specs/field_ionization.md "Boosted frame"): ionizable species stream in like any
   plasma (mobile; ions at rest in the lab). The ADK rate is taken per ion from |E| in its rest frame (from E and B at the
   ion and its momentum: the lab field for an ion at rest in the lab) over its proper time dt / gamma_i; the new electrons
-  get the ion's velocity; the ionization current takes gamma_i I_k (the energy in this frame), so the Gauss law stays
+  get the ion's velocity; the ionization current takes (gamma_i + u . S_rest) I_k, gamma (1 - beta) I_k for a forward laser
+  (the energy of the rest-frame 4-momentum (I_k, I_k S_rest) in this frame; gamma_i I_k until 2026-11-28), so the Gauss law stays
   exact. The ids of the random numbers mix in the step of the ion's first ionization pass (decomposition-independent).
   `ionization.txt` is written in the boosted frame (boosted step and time; the charge states of the ions in the box).
 - **QED** (decision 117, docs/specs/qed.md "Boosted frame"): spin, photon emission and Breit-Wheeler pairs run unchanged

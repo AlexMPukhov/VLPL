@@ -70,6 +70,27 @@ HD inline double ion_rest_field(const double E[3], const double B[3], double ux,
     return s2 > 0 ? sqrt(s2) : 0.0;
 }
 
+// The energy the field pays for one ionization in the simulation frame, in units of I_k, for an ion with momentum u (decision
+// 90, corrected 2026-11-28). In the ion's rest frame the tunnel-exit dipole d_r = I_k E_r / (q_e |E_r|^2) takes the energy I_k
+// and the momentum q_e d_r x B_r = I_k S_r from the field, S_r = E_r x B_r / |E_r|^2 (c = 1; |S_r| = 1 for a plane wave: the
+// photons' momentum I_k / c). Seen from the simulation frame that 4-momentum has the energy gamma_i (I_k + v . I_k S_r):
+//   factor = gamma_i + u . S_r,   E_r = gamma_i E + u x B - u (u . E) / (gamma_i + 1),  B_r = gamma_i B - u x E - u (u . B) / (gamma_i + 1).
+// A forward laser in a frame boosted by gamma (ion at u = -gamma beta along the laser): gamma (1 - beta), the Doppler factor of
+// the laser energy itself; a backward wave: gamma (1 + beta). For u = 0 exactly 1. (Before the correction the code took
+// gamma_i, i.e. dropped the momentum term: 1 / (1 - beta) = 7.5 times too much at gamma = 2, 17.5 at gamma = 3.)
+HD inline double ion_energy_factor(const double E[3], const double B[3], double ux, double uy, double uz) {
+    const double g = sqrt(1.0 + ux * ux + uy * uy + uz * uz), h = 1.0 / (g + 1.0);
+    const double ue = ux * E[0] + uy * E[1] + uz * E[2], ub = ux * B[0] + uy * B[1] + uz * B[2];
+    const double er[3] = {g * E[0] + uy * B[2] - uz * B[1] - ux * ue * h, g * E[1] + uz * B[0] - ux * B[2] - uy * ue * h,
+                          g * E[2] + ux * B[1] - uy * B[0] - uz * ue * h};
+    const double br[3] = {g * B[0] - uy * E[2] + uz * E[1] - ux * ub * h, g * B[1] - uz * E[0] + ux * E[2] - uy * ub * h,
+                          g * B[2] - ux * E[1] + uy * E[0] - uz * ub * h};
+    const double e2 = er[0] * er[0] + er[1] * er[1] + er[2] * er[2];
+    if (!(e2 > 0)) return g;
+    const double sx = er[1] * br[2] - er[2] * br[1], sy = er[2] * br[0] - er[0] * br[2], sz = er[0] * br[1] - er[1] * br[0];
+    return g + (ux * sx + uy * sy + uz * sz) / e2;
+}
+
 // counter-based random numbers (splitmix64), uniform in (0, 1)
 // Not inlined on the GPU: the ptxas of CUDA 12.9 and 13.0 miscompiles this mix for sm_120 when it is inlined into the QED
 // sub-step loops (qed.hpp): the same key gave other random numbers than on the CPU, and the counting and the writing pass

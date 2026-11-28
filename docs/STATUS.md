@@ -511,7 +511,8 @@ sort, `src/tiles.*`) equal to round-off, bit-identical with `numerics.sort_every
   ranks: ionization.txt identical (2D and RZ); GPU (RTX 5090) = CPU (test_ionization and the examples' ionization.txt);
   Smilei 5.1: C2+ / C3+ to 0.3 sigma, transmitted field to 1.2e-3 of the pulse (bench/ionization_smilei/).
 - Boosted frame (decision 90, 2026-11-09, provisional): the ADK rate per ion from |E| in its rest frame (E, B and its momentum)
-  over its proper time dt / gamma_i; the ionization current takes gamma_i I_k; the id hash mixes in the step of the first pass.
+  over its proper time dt / gamma_i; the ionization current takes (gamma_i + u . S_rest) I_k = gamma (1 - beta) I_k for a
+  forward laser (fixed 2026-11-28: it took gamma_i I_k, 1 / (1 - beta) too much); the id hash mixes in the step of the first pass.
   tests/test_boost.cpp B4: charge states boosted (gamma 2) vs lab within 0.15 sigma (2D), 0.91 sigma (RZ), 0.40 sigma (2D,
   three levels per ion); Gauss law <= 3e-17; tests/mpi.sh 1 vs 8 ranks ionization.txt identical (2D) / 1.1e-13 (RZ); lab runs
   bit-identical to main.

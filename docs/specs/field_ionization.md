@@ -68,11 +68,20 @@ gamma_i = sqrt(1 + u^2)):
   boosted frame; the streaming ion sees E_lab again);
 - the time is its proper time over the step, dt / gamma_i (the waiting times are sampled in the rest frame);
 - the new electrons get the ion's velocity, as in the lab;
-- the energy-conserving current: the field pays gamma_i I_k in the simulation frame (the energy of the rest-frame
-  4-momentum transfer (I_k, 0) seen from the boosted frame), so d = gamma_i I_k E / (q_e |E|^2) along the simulation-frame
-  E: q_e w d . E = gamma_i I_k w exactly, and the Gauss law stays at round-off. E_ion = sum gamma_i I_k w is the energy in
-  the simulation frame (E_cur / E_ion = 1 as in the lab). The momentum gamma_i v I_k given to the matter is neglected, as
-  is the mass change of the ion (m_e, I_k) everywhere. The column W_field + W_kin + E_cur of ionization.txt is no check in
+- the energy-conserving current (corrected 2026-11-28): in the ion's rest frame the tunnel-exit dipole
+  d_r = I_k E_r / (q_e |E_r|^2) takes from the field the energy I_k and the momentum q_e d_r x B_r = I_k S_r,
+  S_r = E_r x B_r / |E_r|^2 (c = 1; |S_r| = 1 for a plane wave: the absorbed photons' momentum I_k / c). Seen from the
+  simulation frame this 4-momentum has the energy
+
+      I'_k = (gamma_i + u . S_r) I_k     (ion_energy_factor in src/ionization.hpp; E_r, B_r by the Lorentz transformation),
+
+  gamma (1 - beta) I_k for a forward laser in a frame boosted by gamma (the Doppler factor of the laser energy itself),
+  gamma (1 + beta) I_k for a backward wave. The displacement d = I'_k E / (q_e |E|^2) along the simulation-frame E does
+  exactly that work, q_e w d . E = I'_k w, and the Gauss law stays at round-off. E_ion = sum I'_k w is the energy in the
+  simulation frame (E_cur / E_ion = 1 as in the lab). Until 2026-11-28 the code took gamma_i I_k (the transfer (I_k, 0),
+  without the photons' momentum): 1 / (1 - beta) times too much for a forward laser, 7.5 at gamma = 2, 17.5 at gamma = 3.
+  This went unnoticed because the charge states (B4) do not depend on it; it showed as a laser depletion about three
+  times too large in a gamma = 3 run through helium. B4 now checks I'_k / I_k against the lab run. The mass change of the ion (m_e, I_k) is neglected everywhere. The column W_field + W_kin + E_cur of ionization.txt is no check in
   the boosted frame: the plasma brings kinetic energy through the injection plane and takes it out at the left edge, and a
   new electron is born with the kinetic energy (gamma_i - 1) m_e c^2 of the streaming ion's velocity (the ion keeps its mass).
 - ids: the plasma enters through the injection plane in every step; the hash of the load position also mixes in the step
@@ -81,7 +90,8 @@ gamma_i = sqrt(1 + u^2)):
 
 Lab runs (no `boost`) are unchanged and bit-identical: the simulation-frame |E| and dt, the hash without the step.
 Choices for Alexander (decision 90): the rest-frame rate only in the boosted frame (in a lab run the ions move slowly; a
-lab run with relativistic ions would need the same transformation); gamma_i I_k as the energy taken; the step in the id.
+lab run with relativistic ions would need the same transformation); (gamma_i + u . S_r) I_k as the energy taken (gamma_i I_k
+until 2026-11-28, a bug); the step in the id.
 
 ## Deck interface
 ```
@@ -140,6 +150,11 @@ the bound-electron medium (O7c), collisional ionization (next block).
   RZ a0 = 0.0105: 0.5422 / 0.4578 lab, 0.5448 / 0.4552 boosted (0.91 sigma);
   2D a0 = 0.03: N2+ / N3+ 0.9839 / 0.0161 lab, 0.9834 / 0.0166 boosted (0.40 sigma); RZ a0 = 0.03 (scan): 0.68 sigma.
   Gauss law <= 3.4e-17, E_cur / E_ion - 1 <= 2.2e-16; 748 boosted steps against 3088 lab steps.
+- Energy per ionization, after the correction (2026-11-28, the CPU cluster epyc, Slurm job 18333, commit ba719a7): ion_energy_factor
+  vs the photon Doppler factor gamma (1 - V . k), 1000 random plane waves and frames: 3.2e-15; gamma 2: forward 0.267949,
+  backward 3.732051 (exact). B4 runs: E_ion / sum I_k w = 1 to 1e-12 in the lab, 1.00009 (2D), 1.00008 (RZ), 1.00038
+  (2D, a0 = 0.03) times gamma (1 - beta) = 0.26795 in the boosted runs (before: gamma = 2, 7.46 times too much). Charge
+  states lab vs boosted after the correction: 0.3 sigma (2D), 0.7 sigma (RZ), 0.4 sigma (2D, a0 = 0.03).
 - Lab runs bit-identical to main: examples/ionization_2d.deck and rz_ionization.deck with 1 thread: diag.txt and
   ionization.txt byte-identical; with 32 threads ionization.txt identical and diag.txt identical except the max|dGauss|
   column, which differs at 1e-14 between two runs of main itself (the order of the threads' atomic adds).

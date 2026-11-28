@@ -1204,7 +1204,8 @@ Accepted by Alexander on 2026-10-26 (merge of the architecture spec, PR #1).
       RIP-CC), 2.5e-15 (RZ iRIP, 2 modes); in vacuum 5e-18. Cost: the operator is < 1 % of the step (3D example).
 
 90. **Field ionization in the boosted frame: the ADK rate per ion from |E| in its rest frame over its proper time; the
-    ionization current takes gamma_i I_k; the step of the first pass in the id** (2026-11-09; provisional, for Alexander's
+    ionization current takes (gamma_i + u . S_rest) I_k (corrected 2026-11-28, below); the step of the first pass in the
+    id** (2026-11-09; provisional, for Alexander's
     review; docs/specs/field_ionization.md "Boosted frame", docs/specs/boosted_frame.md, src/ionization.*, tests/test_boost.cpp
     B4, examples/ionization_boost.deck, examples/rz_ionization_boost.deck). Decision 87 refused ionizable species: ions at
     rest in the lab stream at -beta c in the boosted frame, and the field there (a laser: gamma (1 - beta) E_lab) is not the
@@ -1213,7 +1214,14 @@ Accepted by Alexander on 2026-10-26 (merge of the architecture spec, PR #1).
       u^{n-1/2}; the waiting times over the proper time dt / gamma_i. For an ion at rest in the lab this is exactly the lab
       field and the lab time (the rate equations are those of the lab run).
     - New electrons: the ion's position and velocity, as in the lab (one macro-electron per level, the ion's weight).
-    - Ionization current: the energy of the rest-frame transfer (I_k, 0) is gamma_i I_k in the simulation frame; the
+    - Correction (2026-11-28, Alexander: "fix the bug first"): the rest-frame transfer is not (I_k, 0) but (I_k, I_k S_r),
+      S_r = E_r x B_r / |E_r|^2: the tunnel-exit dipole also takes the momentum q_e d_r x B_r (the photons' I_k / c for a
+      plane wave). Its energy in the simulation frame is (gamma_i + u . S_r) I_k (ion_energy_factor), gamma (1 - beta) I_k
+      for a forward laser instead of gamma I_k: the old rule took 1 / (1 - beta) too much (17.5 at gamma = 3), seen as a
+      laser depletion about three times too large in a gamma = 3 helium run. The text below is the original (wrong) rule.
+      Tests: B4 ion_energy_factor vs the photon Doppler factor gamma (1 - V . k) (1000 random plane waves and frames); the
+      energy paid per ionization in the boosted nitrogen runs vs the lab runs.
+    - Ionization current (original, replaced by the correction above): the energy of the rest-frame transfer (I_k, 0) is gamma_i I_k in the simulation frame; the
       displacement d = gamma_i I_k E / (q_e |E|^2) along the simulation-frame E does exactly that work, and the Gauss law
       stays at round-off. E_ion = sum gamma_i I_k w (simulation frame; E_cur / E_ion = 1). The momentum gamma_i v I_k of the
       transfer and the mass change of the ion are neglected (as in the lab). W_field + W_kin + E_cur in ionization.txt is no

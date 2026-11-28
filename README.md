@@ -852,7 +852,8 @@ preparation), whose verification scripts, decks and figure scripts are in `bench
   and other interactions beyond, bench/antenna_nearfield). Not
   yet: LASY files, Cart3D TFSF, side tube, media, the implicit mover. Checkpoints hold the partial lab snapshots (decision 116). Field
   ionization (decision 90): ionization.txt is in the boosted frame, and its column W_field + W_kin + E_cur is no energy
-  check there. Hot plasma with
+  check there; the ionization current takes gamma (1 - beta) I_k per event for a forward laser (the rest-frame energy and
+  photon momentum seen from the boosted frame; until 2026-11-28 it took gamma I_k, 1 / (1 - beta) too much). Hot plasma with
   RIP-CC: the Gauss law is exact only once the window moves (the lab window's limitation); iRIP and cold plasma: exact.
 - I/O: serial HDF5 through rank 0 (parallel HDF5 when the output time at many GPUs matters).
 - Yee: periodic boxes only so far (no open x, laser, window, CPML); Mur and a Yee CPML when a
