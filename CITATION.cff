@@ -17,8 +17,11 @@ identifiers:
   - type: doi
     value: "10.5281/zenodo.24503314"
     description: "VLPL v1.0.0"
-version: "1.1.0"
-date-released: "2026-11-25"
+  - type: doi
+    value: "10.5281/zenodo.24517961"
+    description: "VLPL v1.1.0"
+version: "1.2.0"
+date-released: "2026-11-28"
 keywords:
   - particle-in-cell
   - plasma physics
